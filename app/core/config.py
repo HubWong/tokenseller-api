@@ -89,7 +89,8 @@ class Settings(BaseSettings):
     GOOGLE_CLIENT_SECRET: str = os.getenv("GOOGLE_CLIENT_SECRET", "")
     
     # Frontend URL for OAuth callbacks
-    OAUTH_REDIRECT_URL: str = os.getenv("OAUTH_REDIRECT_URL", "https://tokenseller-api-production.up.railway.app")
+    OAUTH_REDIRECT_URL: str = os.getenv("OAUTH_REDIRECT_URL", "https://tokenmaker.ccwu.cc")
+  
     # Backend URL for OAuth provider redirect_uri (OAuth providers redirect back here)
      # CORS
     FRONTEND_URL: str = os.getenv('FRONTEND_URL','')
