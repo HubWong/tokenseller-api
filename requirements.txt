@@ -1,0 +1,50 @@
+# Web 框架 & 服务
+fastapi[standard]
+uvicorn[standard]
+python-multipart
+aiofiles
+
+# 数据库 & ORM
+sqlalchemy
+sqlmodel
+alembic
+psycopg2-binary
+asyncpg
+databases[postgresql]
+redis
+
+# 认证 & 加密
+passlib[bcrypt]
+python-jose[cryptography]
+python-decouple
+python-dotenv
+authlib
+base58
+ed25519-blake2b
+bip-utils
+
+# 定时任务
+apscheduler
+
+# 文件/图片处理
+Pillow
+qrcode[pil]
+
+aiosqlite
+# 接口限流
+slowapi
+
+# 网络 & 实时通信
+python-socketio
+tenacity
+
+# 区块链
+web3
+tronpy
+eth-account
+python-bitcoinrpc
+tiktoken
+
+transformers 
+torch
+itsdangerous

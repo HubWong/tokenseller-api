@@ -1,0 +1,12 @@
+Generic single-database configuration.
+
+  
+for migrations:
+run command, and also update the table class with length in string type:
+ alembic revision --autogenerate -m "add user setting tables"
+ alembic upgrade head
+For future changes to your models, repeat 2 up cmd, just update the '-m' comment
+
+del the last script:
+ alembic downgrade -1  
+ # you need to rmv the file manually.
