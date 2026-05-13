@@ -3,7 +3,7 @@ fastapi[standard]
 uvicorn[standard]
 python-multipart
 aiofiles
-
+cloudinary
 # 数据库 & ORM
 sqlalchemy
 sqlmodel
