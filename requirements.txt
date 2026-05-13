@@ -10,6 +10,7 @@ sqlmodel
 alembic
 psycopg2-binary
 asyncpg
+psycopg[async]
 databases[postgresql]
 redis
 
