@@ -51,8 +51,7 @@ class Settings(BaseSettings):
     )
 
     REDIS_POOL_SIZE: int = int(os.getenv("REDIS_POOL_SIZE", 20))
-    # CORS
-    FRONTEND_URL: str = os.getenv('FRONTEND_URL','')
+   
     
     # Payment
     PAYPAL_CLIENT_ID: Optional[str] = os.getenv("PAYPAL_CLIENT_ID")
@@ -92,7 +91,9 @@ class Settings(BaseSettings):
     # Frontend URL for OAuth callbacks
     OAUTH_REDIRECT_URL: str = os.getenv("OAUTH_REDIRECT_URL", "http://localhost:5173")
     # Backend URL for OAuth provider redirect_uri (OAuth providers redirect back here)
-    BACKEND_URL: str = os.getenv("BACKEND_URL", "http://localhost:8000")
+     # CORS
+    FRONTEND_URL: str = os.getenv('FRONTEND_URL','')
+    BACKEND_URL: str = os.getenv("BACKEND_URL", "https://tokenseller-api-production.up.railway.app")
     BILL_PRICE_SET :list[float] = [10,25,50,100,200,500]
     PROFILE_RATE : float = 3.2  # 销售价格 = 成本 * PROFILE_RATE
 
