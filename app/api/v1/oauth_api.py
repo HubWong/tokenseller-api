@@ -207,7 +207,7 @@ async def github_callback(
 
     except Exception as e:
         logger.error(f"GitHub OAuth callback error: {e}", exc_info=True)
-        error_url = f"{settings.OAUTH_REDIRECT_URL}/login?error=oauth_failed&provider=github"
+        error_url = f"{settings.FRONTEND_URL}/login?error=oauth_failed&provider=github"
         return RedirectResponse(url=error_url)
 
 
