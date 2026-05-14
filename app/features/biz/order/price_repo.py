@@ -69,7 +69,7 @@ class PriceRepo:
         result = await self.db.execute(query)
         data = result.scalars().all()
         if not data:
-            raise Exception("No pricing data found")
+           return []
         result =[]
         for item in data:
             if item.model_name == 'default':
