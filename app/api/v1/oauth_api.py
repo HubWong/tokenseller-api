@@ -256,7 +256,7 @@ async def google_callback(
 
         # 生成 JWT tokens
         access_token = create_access_token(subject=str(user.id))
-        refresh_token = create_refresh_token(subject=str(user.id))
+        refresh_token = create_refresh_token(subject=str(user.id))[1]
 
         # 重定向回前端，带上 token 和用户名
         from urllib.parse import urlencode
