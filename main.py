@@ -2,7 +2,6 @@
 """
 AI Token Hub API - Optimized Version
 """
-import logging
 
 from fastapi import FastAPI,Depends
 from fastapi.middleware.cors import CORSMiddleware
