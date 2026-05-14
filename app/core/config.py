@@ -39,7 +39,7 @@ class Settings(BaseSettings):
     SQL_DB_URL: str = os.getenv(
         "DATABASE_URL",  f"sqlite+aiosqlite:///{os.path.join(PROJECT_ROOT, 'tokens.db')}"
     )
-    SQL_DB_URL_Sync = os.getenv(
+    SQL_DB_URL_Sync:str = os.getenv(
         "SQL_DB_URL_Sync",  f"sqlite:///{os.path.join(PROJECT_ROOT, 'tokens.db')}"
     )
    

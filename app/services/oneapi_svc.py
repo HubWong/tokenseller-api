@@ -20,6 +20,7 @@ from fastapi.responses import StreamingResponse
 from app.core.config import settings
 from starlette.requests import ClientDisconnect
 from app.features.biz.apikey.apikey_crud import apikey_crud
+import tiktoken
 
 from app.core.abc_biz import  ConsumeService
 
@@ -85,7 +86,6 @@ class UsageTracker:
         if self.has_real_usage:
             return self.usage
 
-        import tiktoken
         try:
             enc = tiktoken.encoding_for_model(self.model)
         except Exception:

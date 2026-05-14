@@ -11,6 +11,7 @@ alembic
 psycopg2-binary
 asyncpg
 psycopg[binary]
+psycopg2-binary
 databases[postgresql]
 redis
 
