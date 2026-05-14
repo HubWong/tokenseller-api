@@ -41,7 +41,7 @@ class TransactionRepo:
             from_uid = meta.get('user_id',None) if meta else None
             if transaction_type != TransactionType.RECHARGE_FREE:             
                 mm=f'from {from_uid}'
-                
+
             data = Transaction(
                 maker_id=maker_id,
                 amount=amount,
@@ -78,7 +78,7 @@ class TransactionRepo:
                 select(Transaction)
                 .where(
                     Transaction.maker_id == user_id,
-                    Transaction.type == trans_type.value,
+                    Transaction.type == trans_type,
                     func.extract('year', Transaction.created_at) == datetime.now().year,
                     func.extract('month', Transaction.created_at) == datetime.now().month
                 )
