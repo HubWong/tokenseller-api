@@ -267,12 +267,12 @@ async def google_callback(
             "email": email,
             "username": username or "",
         })
-        frontend_callback = f"{settings.OAUTH_REDIRECT_URL}/oauth/callback?{params}"
+        frontend_callback = f"{settings.FRONTEND_URL}/oauth/callback?{params}"
         return RedirectResponse(url=frontend_callback)
 
     except Exception as e:
         logger.error(f"Google OAuth callback error: {e}", exc_info=True)
-        error_url = f"{settings.OAUTH_REDIRECT_URL}/login?error=oauth_failed&provider=google"
+        error_url = f"{settings.FRONTEND_URL}/login?error=oauth_failed&provider=google"
         return RedirectResponse(url=error_url)
 
 
