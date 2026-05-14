@@ -191,7 +191,7 @@ async def github_callback(
 
         # 生成 JWT tokens
         access_token = create_access_token(subject=str(user.id))
-        refresh_token = create_refresh_token(subject=str(user.id))
+        refresh_token = create_refresh_token(subject=str(user.id))[1]
 
         # 重定向回前端，带上 token 和用户名
         from urllib.parse import urlencode
@@ -202,7 +202,7 @@ async def github_callback(
             "email": email,
             "username": username or "",
         })
-        frontend_callback = f"{settings.OAUTH_REDIRECT_URL}/oauth/callback?{params}"
+        frontend_callback = f"{settings.FRONTEND_URL}/oauth/callback?{params}"
         return RedirectResponse(url=frontend_callback)
 
     except Exception as e:
@@ -299,6 +299,6 @@ async def debug_oauth():
         "github_client_secret_set": bool(settings.GITHUB_CLIENT_SECRET),
         "google_client_id_set": bool(settings.GOOGLE_CLIENT_ID),
         "google_client_secret_set": bool(settings.GOOGLE_CLIENT_SECRET),
-        "redirect_url": settings.OAUTH_REDIRECT_URL,
+        "redirect_url": settings.BACKEND_URL,
         "backend_url": settings.BACKEND_URL,
     }
