@@ -49,10 +49,7 @@ class Transaction(Base,TimestampMixin):
     # 消费：负数
     # 充值/佣金：正数
 
-    type: Mapped[TransactionType] = mapped_column(
-        Enum(TransactionType, values_callable=lambda x: [e.value for e in x]), 
-        nullable=False
-    )
+    type: Mapped[str] = mapped_column(String(50), nullable=False)
     # 可选：来源说明（例如：gpt-4o / usdt / stripe）
     source: Mapped[str] = mapped_column(String(100), nullable=True)
     # 可选：订单ID / 外部交易ID
