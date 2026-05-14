@@ -2,6 +2,8 @@
 """
 AI Token Hub API - Optimized Version
 """
+import logging
+
 from fastapi import FastAPI,Depends
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware  # 
@@ -20,6 +22,7 @@ from app.back_jobs.schedule import lifespanJob
 from app.core.deps import get_price_repo
 from app.features.biz.order.price_repo import PriceRepo
 from app.core.config import settings
+
 
 domain_url = settings.FRONTEND_URL
 # ============== FastAPI App ==============
