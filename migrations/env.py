@@ -26,7 +26,7 @@ config = context.config
 
 # 使用与应用程序相同的数据库路径
  
-db_path =  "postgresql://postgres:wyb@localhost/token_seller"
+db_path = settings.SQL_DB_URL_Sync
 config.set_main_option("sqlalchemy.url", f"{db_path}")
  
 
