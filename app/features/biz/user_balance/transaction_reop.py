@@ -47,7 +47,7 @@ class TransactionRepo:
             data = Transaction(
                 maker_id=maker_id,
                 amount=amount,
-                type=transaction_type,
+                type=transaction_type.value,
                 memo=mm,
                 ref_id = str(order_id)
             )
