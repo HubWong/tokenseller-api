@@ -4,10 +4,26 @@ from typing import Optional,Any
 import os
 from dotenv import load_dotenv
 
-load_dotenv()
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+def load_environment_file() -> str:
+    """Load environment variables from base .env and environment-specific .env files."""
+    base_env = os.path.join(PROJECT_ROOT, ".env")
+    if os.path.exists(base_env):
+        load_dotenv(base_env, override=False)
+
+    app_env = os.getenv("APP_ENV", os.getenv("PYTHON_ENV", "development")).lower()
+    env_specific = os.path.join(PROJECT_ROOT, f".env.{app_env}")
+    if os.path.exists(env_specific):
+        load_dotenv(env_specific, override=True)
+
+    return app_env
+
+APP_ENV = load_environment_file()
 
 class Settings(BaseSettings):   
     PROJECT_NAME: str = "token_seller"
+    APP_ENV: str = APP_ENV
     VERSION: str = "1.0.0"
     API_V1_STR: str = "/api/v1"
     BASE_DIR: str = os.path.dirname(os.path.abspath(__file__))
