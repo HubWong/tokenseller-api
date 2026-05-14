@@ -39,19 +39,18 @@ class Settings(BaseSettings):
     SQL_DB_URL: str = os.getenv(
         "DATABASE_URL",  f"sqlite+aiosqlite:///{os.path.join(PROJECT_ROOT, 'tokens.db')}"
     )
-    # SQLITE_DB_URL: str = os.getenv(
-    #     "SQLITE_DB_URL",
-    #     f"sqlite:///{os.path.join(PROJECT_ROOT, 'tokens.db')}"
-    # )    
-    # Redis
-  
+    SQL_DB_URL_Sync = os.getenv(
+        "SQL_DB_URL_Sync",  f"sqlite:///{os.path.join(PROJECT_ROOT, 'tokens.db')}"
+    )
+   
     REDIS_URL: str = os.getenv(
         "REDIS_URL",
         "redis://localhost:6379/0"
     )
 
     REDIS_POOL_SIZE: int = int(os.getenv("REDIS_POOL_SIZE", 20))
-   
+    # CORS
+    FRONTEND_URL: str = os.getenv('FRONTEND_URL','')
     
     # Payment
     PAYPAL_CLIENT_ID: Optional[str] = os.getenv("PAYPAL_CLIENT_ID")
@@ -90,10 +89,7 @@ class Settings(BaseSettings):
     
     # Frontend URL for OAuth callbacks
     OAUTH_REDIRECT_URL: str = os.getenv("OAUTH_REDIRECT_URL", "https://tokenmaker.ccwu.cc")
-  
     # Backend URL for OAuth provider redirect_uri (OAuth providers redirect back here)
-     # CORS
-    FRONTEND_URL: str = os.getenv('FRONTEND_URL','')
     BACKEND_URL: str = os.getenv("BACKEND_URL", "https://tokenseller-api-production.up.railway.app")
     BILL_PRICE_SET :list[float] = [10,25,50,100,200,500]
     PROFILE_RATE : float = 3.2  # 销售价格 = 成本 * PROFILE_RATE
