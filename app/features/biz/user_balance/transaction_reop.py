@@ -39,10 +39,9 @@ class TransactionRepo:
         try:
             order_id = meta.get("id", None) if meta else None
             from_uid = meta.get('user_id',None) if meta else None
-            if transaction_type == TransactionType.RECHARGE_FREE:
-                mm = f'sys-free'
-            else:
+            if transaction_type != TransactionType.RECHARGE_FREE:             
                 mm=f'from {from_uid}'
+                
             data = Transaction(
                 maker_id=maker_id,
                 amount=amount,
