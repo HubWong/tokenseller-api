@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class Settings(BaseSettings):   
-    PROJECT_NAME: str = "app_chat"
+    PROJECT_NAME: str = "token_seller"
     VERSION: str = "1.0.0"
     API_V1_STR: str = "/api/v1"
     BASE_DIR: str = os.path.dirname(os.path.abspath(__file__))
