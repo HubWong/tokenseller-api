@@ -137,23 +137,23 @@ class TransactionRepo:
         if not money_list:
             money_list = [25 * (2 ** n) for n in range(10) if 25 * (2 ** n) < 500]
         
-        result = {x:await token_cal_svc.money_to_tokens(amount=x,model=model_str) for x in money_list}
-        return result
+        #result = {x:await token_cal_svc.money_to_tokens(amount=x,model=model_str) for x in money_list}
+        return money_list
 
-    async def get_bill_datas(self, db: AsyncSession, token_cal_svc:TokenCostCalculator, user_id: int) -> Optional[Dict]:
+    async def get_bill_datas(self, db: AsyncSession,token_cal_svc:TokenCostCalculator, user_id: int) -> Optional[Dict]:
         """Get user bill data by user_id"""
         
         data, total_left = await self.get_transaction_logs(db=db,typstr="",user_id=user_id)
         _, total_recharged = await self.get_transaction_logs(db=db,typstr="recharge",user_id=user_id)
         # Get monthly consume transactions and total amount
         _, monthly_trans = await self.get_month_trans(user_id, 'consume', db)
-        #money_tokens = await self.get_tokens_by_money(token_cal_svc=token_cal_svc)
-        return { 
-             
+        money_tokens = settings.BILL_PRICE_SET
+        return {  
             'balance':total_left,
             'monthly_trans':monthly_trans,
             'trans_logs':data, 
-            'total_recharge':total_recharged
+            'total_recharge':total_recharged,
+            'money_tokens':money_tokens
         }
 
 

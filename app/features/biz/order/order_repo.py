@@ -143,6 +143,8 @@ class OrderRepo():
             obj_in.to_address = new_address
             obj_in.path_index= idx
             obj_in.contract = ''
+            obj_in.currency = 'usdt'
+            obj_in.chain= 'tron'
             obj_in.expired_at = datetime.now()+ timedelta(minutes=20)
             # 推荐：如果 CRUDBase 已实现 create，优先使用 super().create(db, obj_in=obj_in)
             # 手动创建时，建议过滤掉非模型字段

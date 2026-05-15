@@ -49,11 +49,12 @@ class ProvidersResponse(BaseModel):
 
         
 class OrderBase(PurchaseRequest):   
-    currency: Optional[str] = "usdc"  # usdt/usdc
+    currency: Optional[str] = "usdt"  # usdt/usdc
     order_for: Optional[str] = None
 
 class OrderCreateIn(OrderBase):
     to_address:Optional[str] = None
+    chain:Optional[str] = 'tron'
     path_index :Optional[int]=None
     contract:Optional[str]=''
     order_status: Optional[OrderStatus|str] = OrderStatus.PENDING.value

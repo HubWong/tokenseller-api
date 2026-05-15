@@ -24,6 +24,7 @@ async def create_key_api(api_key: dict, user:User=Depends(get_current_user), cru
 
 @router.get("/")
 async def get_user_apikeys(
-    user: User = Depends(get_current_user),crud:CRUDApiKey=Depends(get_apikey_crud), db: AsyncSession = Depends(get_db)
+    user: User = Depends(get_current_user),
+    crud:CRUDApiKey=Depends(get_apikey_crud), db: AsyncSession = Depends(get_db)
 ):
     return await crud.get_keys(db=db, user_id=getattr(user, "id"))
