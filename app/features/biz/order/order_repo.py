@@ -163,7 +163,7 @@ class OrderRepo():
             print(f"❌ 创建订单失败: {e}")
 
             await self.db.rollback()
-            return ApiResp(success=False, message="创建订单失败")
+            return ApiResp(success=False, message=f"创建订单失败: {str(e)}")
        
 
 
