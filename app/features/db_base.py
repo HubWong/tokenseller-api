@@ -22,8 +22,6 @@ from typing import Generic, TypeVar, Optional
 
 
 
-# In-memory user storage (replace with database in production)
-
 T = TypeVar('T')
 
 class ApiResp(BaseModel, Generic[T]):

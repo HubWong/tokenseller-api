@@ -10,19 +10,7 @@
 cp .env.example .env
 ```
 
-### 2. 配置数据库路径
 
-编辑 `.env` 文件：
-
-```env
-# SQLite database URL
-SQLITE_DB_URL=sqlite:///./tokens.db
-```
-
-支持的格式：
-- **相对路径**: `sqlite:///./tokens.db` (当前目录)
-- **绝对路径**: `sqlite:////full/path/to/tokens.db` (Linux/Mac)
-- **Windows**: `sqlite:///C:/path/to/tokens.db` (注意正斜杠)
 
 ## 数据库迁移
 
