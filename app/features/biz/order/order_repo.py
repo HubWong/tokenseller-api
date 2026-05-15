@@ -140,14 +140,13 @@ class OrderRepo():
             return ApiResp(success=True,data= old_order)
         try:  
             new_address,idx=  await self.address_svc.get_address_by_redis()
+            print(f"🔑 获取新地址: {new_address}, idx: {idx}")
             obj_in.to_address = new_address
             obj_in.path_index= idx
             obj_in.contract = ''
             obj_in.currency = 'usdt'
             obj_in.chain= 'tron'
-            obj_in.expired_at = datetime.now()+ timedelta(minutes=20)
-            # 推荐：如果 CRUDBase 已实现 create，优先使用 super().create(db, obj_in=obj_in)
-            # 手动创建时，建议过滤掉非模型字段
+            obj_in.expired_at = datetime.now()+ timedelta(minutes=20)          
             obj_data = obj_in.model_dump(exclude_unset=True)
             db_obj = Order(**obj_data)
 
@@ -158,13 +157,13 @@ class OrderRepo():
             OrderOut = OrderInDBBase.model_validate(db_obj)
             await order_pool.add_order(OrderOut)
 
-            return ApiResp(success=True, msg="创建订单成功", data=OrderOut)
+            return ApiResp(success=True, message="创建订单成功", data=OrderOut)
 
         except Exception as e:
             print(f"❌ 创建订单失败: {e}")
 
             await self.db.rollback()
-            return ApiResp(success=False, msg="创建订单失败")
+            return ApiResp(success=False, message="创建订单失败")
        
 
 
