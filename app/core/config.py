@@ -61,7 +61,7 @@ class Settings(BaseSettings):
    
     REDIS_URL: str = os.getenv(
         "REDIS_URL",
-        "redis://default:HYWOrzxxIaMSwuymHbICKQbTnmovFTFF@shinkansen.proxy.rlwy.net:31115"
+        "redis://localhost:6379/0"
     )
 
     REDIS_POOL_SIZE: int = int(os.getenv("REDIS_POOL_SIZE", 20))
