@@ -106,7 +106,7 @@ class UsageTracker:
 class OneAPISvc:
     def __init__(
         self,
-        base_url: str = settings.ONEAPI_BASE_URL,
+        base_url: str = settings.ONEAPI_CHAT_URL,
         api_key: str = "",
         timeout: int = 30,
     ):

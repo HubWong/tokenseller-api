@@ -33,8 +33,8 @@ class Settings(BaseSettings):
     
     PROJECT_ROOT: str = os.path.dirname(os.path.dirname(os.path.dirname(BASE_DIR)))  # backend/app/core -> backend/app -> backend -> token seller
     ONE_API_MASTERKEY :str = os.getenv("ONE_API_MASTER_KEY","sk-AQXahBqz3MbEKKBl55941dBe8c5248368aCd4215B8422eFc")
-    ONEAPI_URL:str =os.getenv('ONEAPI_URL',"http://localhost:3000")
-    ONEAPI_BASE_URL: str = os.getenv("ONEAPI_BASE_URL", "http://localhost:3000/v1/chat/completions")
+    ONEAPI_URL:str =os.getenv('ONEAPI_BASE',"http://localhost:3000")
+    ONEAPI_CHAT_URL: str = os.getenv("ONEAPI_CHAT_URL", "http://localhost:3000/v1/chat/completions")
     ONEAPI_ACCESS_TOKEN :str = 'd787ddd3d2da492f80483076533cfe3a'
     #room
     MAX_ROOM_PER_USER: int = 3
