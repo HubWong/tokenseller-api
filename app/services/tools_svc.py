@@ -1,6 +1,7 @@
 import socket
 import random
 import string
+import requests
 
 def set_env_if_not_exists(key, value, env_file=".env"):
     config = dotenv_values(env_file)
@@ -10,6 +11,19 @@ def set_env_if_not_exists(key, value, env_file=".env"):
         return True
 
     return False
+
+def check_api_reachable(host: str, timeout: int = 2) -> bool:
+    try:
+        # 自动补全协议
+        url = f"http://{host}" if not host.startswith("http") else host
+        
+        # 用 get 也可以，timeout 保证不卡死
+        requests.get(url, timeout=timeout, stream=True)
+        return True
+        
+    except:
+        return False
+
 def check_port_open(host: str, port: int, timeout: int = 2) -> bool:
     """
     检测指定主机的端口是否开放（TCP）
