@@ -24,7 +24,7 @@ async def chat_endpoint(
     token_repo:TokenUsageRepo = Depends(get_token_usage_rep),
     stream: bool = False  
 ):
-    is_open = check_api_reachable(settings.ONEAPI_URL,6)
+    is_open = check_api_reachable('one-api-production-73ea.up.railway.app/v1',6)
     if not is_open:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail = 'api can not be reached')
     return await oneSvc.chat_llm(db=db,
