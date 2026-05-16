@@ -41,6 +41,7 @@ class SmtpSvc:
                f"If you did not request a password reset, please ignore this email.\n\n"
 
         message.attach(MIMEText(body, "plain"))
+        server = None
         try:
             server = smtplib.SMTP(self.smtp_svr, self.port)
             server.starttls()  # 启用TLS加密
@@ -52,8 +53,8 @@ class SmtpSvc:
             print(f"email sending failed: {e}")
             return ApiResp(success=False,message=str(e))
         finally:
-            server.quit()
-            
+            if server:
+                server.quit()
 
     # 工具函数：生成JWT
     @staticmethod
@@ -85,6 +86,7 @@ class SmtpSvc:
                f"If you did not request this code, please ignore this email.\n\n"
 
         message.attach(MIMEText(body, "plain"))
+        server = None
         try:
             server = smtplib.SMTP(self.smtp_svr, self.port)
             server.starttls()  # 启用TLS加密
@@ -96,7 +98,8 @@ class SmtpSvc:
             print(f"failed {e}")
             return ApiResp(success=False,message=str(e))
         finally:
-            server.quit()
+            if server:
+                server.quit()
 
 smtp = SmtpSvc(from_email="gogowyb@gmail.com",
                sender_pwd="szfm bjhc xkjn ssll",
