@@ -21,12 +21,13 @@ algorithm = settings.SECRET_KEY_ALGORITHM
 token_expire_minutes = settings.EXPIRE_TOKEN_MINUTES_LOST_PWD
 
 class SmtpSvc:
-    def __init__(self, from_email, sender_pwd, appRouteUrl):
+    def __init__(self, from_email, sender_pwd, appRouteUrl, timeout: int = 10):
         self.smtp_svr = smtp_server
         self.port = port
         self.sender = from_email or sender_email
         self.sender_pwd = sender_pwd or sender_password
-        self.appRoute = appRouteUrl       
+        self.appRoute = appRouteUrl      
+        self.timeout = timeout
 
     async def send_link_with_token(
         self, toEmail: str, token: str, subject: str = "Reset Your Password"
@@ -43,7 +44,7 @@ class SmtpSvc:
         message.attach(MIMEText(body, "plain"))
         server = None
         try:
-            server = smtplib.SMTP(self.smtp_svr, self.port)
+            server = smtplib.SMTP(self.smtp_svr, self.port, timeout=self.timeout)
             server.starttls()  # 启用TLS加密
             server.login(self.sender, self.sender_pwd)
             server.sendmail(self.sender, toEmail, message.as_string())
@@ -88,7 +89,7 @@ class SmtpSvc:
         message.attach(MIMEText(body, "plain"))
         server = None
         try:
-            server = smtplib.SMTP(self.smtp_svr, self.port)
+            server = smtplib.SMTP(self.smtp_svr, self.port, timeout=self.timeout)
             server.starttls()  # 启用TLS加密
             server.login(self.sender, self.sender_pwd)
             server.sendmail(self.sender, toEmail, message.as_string())
