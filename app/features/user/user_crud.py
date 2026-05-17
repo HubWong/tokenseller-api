@@ -330,7 +330,7 @@ class CRUDUser(CRUDBase[User, UserCreate, UserCvUpdate]):
             db.add(user)
             await db.commit()
             await db.refresh(user)
-            return await smtp.send_link_with_token(toEmail=email, token=reset_token)
+            return await smtp.send_email_async(to=email, token=reset_token)
         except Exception as e:
             await db.rollback()
             return ApiResp(success=False, message=str(e))

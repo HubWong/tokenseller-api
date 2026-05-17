@@ -3,9 +3,12 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.utils import formataddr
 import smtplib
+
+import httpx
 from app.features.db_base import ApiResp
 from jose import JWTError, jwt
 from app.core.config import settings
+import requests
 
 # send email to other, get email from token
 
@@ -19,6 +22,7 @@ sender_name = settings.PROJECT_NAME
 secret_key = settings.SECRET_KEY
 algorithm = settings.SECRET_KEY_ALGORITHM
 token_expire_minutes = settings.EXPIRE_TOKEN_MINUTES_LOST_PWD
+RESEND_API_KEY = settings.RESEND_API_KEY
 
 class SmtpSvc:
     def __init__(self, from_email, sender_pwd, appRouteUrl, timeout: int = 10):
@@ -28,6 +32,35 @@ class SmtpSvc:
         self.sender_pwd = sender_pwd or sender_password
         self.appRoute = appRouteUrl      
         self.timeout = timeout
+
+
+    async def send_email_async(self,to: str, token: str):
+        reset_link = f'{my_domain}/{self.appRoute}?token={token}'
+        try:
+            async with httpx.AsyncClient() as client:
+                await client.post(
+                    "https://api.resend.com/emails",
+                    headers={
+                        "Authorization": f"Bearer {RESEND_API_KEY}",
+                        "Content-Type": "application/json"
+                    },
+                    json={
+                        "from": f"noreply@tokenmaker.cc",
+                        "to": to,
+                        "subject": "Reset your password",
+                        "html": f"""
+                        <h2>Reset Password</h2>
+                        <p>Valid for 10 minutes</p>
+                        <a href="{reset_link}">Reset</a>
+                        """
+                    }
+                )
+            return ApiResp(success=True,message=f'请于{token_expire_minutes}分钟之内完成密码修改')
+        except Exception as ex:
+            print(f"Failed to send email: {ex}")
+            return ApiResp(success=False, message=str(ex))
+        
+       
 
     async def send_link_with_token(
         self, toEmail: str, token: str, subject: str = "Reset Your Password"

@@ -109,7 +109,7 @@ class Settings(BaseSettings):
     BACKEND_URL: str = os.getenv("BACKEND_URL", "https://tokenseller-api-production.up.railway.app")
     BILL_PRICE_SET :list[float] = [10,25,50,100,200,500]
     PROFILE_RATE : float = 3.2  # 销售价格 = 成本 * PROFILE_RATE
-
+    RESEND_API_KEY: str = os.getenv("RESEND_API_KEY", "")
 
 settings = Settings()
 
