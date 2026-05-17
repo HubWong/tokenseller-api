@@ -314,8 +314,7 @@ class CRUDUser(CRUDBase[User, UserCreate, UserCvUpdate]):
 
             return total, [UserInDB.model_validate(u) for u in users]
         return 0, []
-
-  
+ 
 
 
     async def request_reset_pwd(self, email: str, db: AsyncSession) -> ApiResp:
