@@ -11,7 +11,7 @@ from app.features.db_base import ApiResp, PagedResp
 from app.features.biz.order.order_schema import OrderStatus
 from app.features.user.model.user_model import User
 from app.features.admin.admin_schema import AdminUserUpdate
-from app.features.user.schemas.user_schema import UserInDB, UserWithAvatarOut
+from app.features.user.schemas.user_schema import UserInDB, UserForAdmin
 
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -30,7 +30,7 @@ async def get_dashboard_stats(
 
 # # 用户管理
 
-@router.get("/users/{page}", response_model=PagedResp[List[UserWithAvatarOut]])
+@router.get("/users/{page}", response_model=PagedResp[List[UserForAdmin]])
 async def read_users(
     db: AsyncSession = Depends(get_db),
     page: int = 1,
@@ -38,7 +38,7 @@ async def read_users(
     sort_by: str = Query("id", pattern="^(id|name|created_at)$"),
     sort_order: str = Query("asc", pattern="^(asc|desc)$"),
 ):
-    total,data  = await user_crud.user_list(
+    data,total  = await user_crud.user_list(
         db,
         page=page,
         size=size,
@@ -55,13 +55,12 @@ async def read_users(
     )
 
 
-@router.put("/users/{user_id}", response_model=ApiResp[UserInDB])
+@router.put("/user/{user_id}/deactive", response_model=ApiResp[UserForAdmin])
 async def update_user(
     *,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(admin_required),
-    user_id: int,
-    user_in: AdminUserUpdate
+    user_id: int,    
 ):
     """更新用户信息"""
     user =await user_crud.get(db, id=user_id)
@@ -87,38 +86,6 @@ async def delete_user(
     return ApiResp(success=True, message="User deleted successfully")
 
 # 支付管理
-
-
-@router.get("/payments/{pg}")
-async def get_payments(
-    *,
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(admin_required),
-    pg: int = 1,
-    limit: int = 100,
-    status: str = OrderStatus.SUCCESS.value,
-    user_id: Optional[int] = None
-):
-    """获取支付记录列表"""
-    filters = {}
-    if status:
-        filters["status"] = status
-    if user_id:
-        filters["user_id"] = user_id
-    skip = (pg - 1) * limit
-
-    total, payments = await payment_crud.admin_get_payments(
-        db, skip=skip, limit=limit, payment_status=OrderStatus(status)
-    )
-
-    return PagedResp(
-        success=True,
-        data=[PaymentInDBBase.model_validate(Order) for Order in payments],
-        total=total,
-        page=pg,
-        size=limit
-    )
-
 
 @router.put("/payments/{payment_id}/status", response_model=ApiResp)
 async def update_payment_status(

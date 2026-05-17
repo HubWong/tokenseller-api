@@ -1,8 +1,8 @@
-from ast import Dict
+from typing import Dict
 from datetime import datetime
 from typing import Optional, List, Sequence
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update
+from sqlalchemy import select
 from app.features.biz.user_balance.models import Transaction,TransactionType
 
 import logging

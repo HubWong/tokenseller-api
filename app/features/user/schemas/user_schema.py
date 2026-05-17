@@ -46,12 +46,7 @@ class UserInDBBase(BaseModel):
 
 class BaseUser(BaseModel):
     id: Optional[str|int] = None  
-    username: Optional[str] = None
-   
-    gender: Optional[int] = None
-    birth_year: Optional[int] = None     
-    
-    
+    username: Optional[str] = None    
     
     class Config:
         from_attributes = True
@@ -88,8 +83,7 @@ class UserInDB(BaseUser):
     created_at: Optional[datetime] = None   
   
 
-class UserWithAvatarOut(BaseUser):
-    avatar: Optional[str] = None
+class UserForAdmin(BaseUser):
     email: Optional[EmailStr] = None
     role: Optional[str] = None
     is_active: Optional[bool] = None
@@ -102,7 +96,7 @@ class UserInDbPhotos(BaseUser):
     photos:Optional[List[PhotoInDB]] = None
 
 class UserList(BaseModel):
-    users: List[UserWithAvatarOut]
+    users: List[UserForAdmin]
     total: int
 
 

@@ -14,7 +14,7 @@ from app.features.user.model.user_photo import Photo
 from app.features.user.token_crud import token_crud
 from app.features.admin.admin_schema import AdminUserUpdate, AdminConsoleData
 from app.features.user.schemas.token_schema import LostPasswordReset, TokenSchemaUser
-from app.features.user.schemas.user_schema import UserLoginResp, UserCreate, UserInDB, UserCvUpdate, UserInDbPhotos,UserWithAvatarOut
+from app.features.user.schemas.user_schema import UserLoginResp, UserCreate, UserInDB, UserCvUpdate, UserInDbPhotos,UserForAdmin
 from app.core.security import (
     create_access_token,
     create_refresh_token,
@@ -215,7 +215,7 @@ class CRUDUser(CRUDBase[User, UserCreate, UserCvUpdate]):
         page: int = 1,       
         sort_by: str = "id",        # 支持排序字段：id, name, created_at
         sort_order: str = "asc",    # asc / desc
-    ) -> Tuple[int, Sequence[UserWithAvatarOut]]:
+    ) -> Tuple[int, Sequence[UserForAdmin]]:
         
         """
         返回：(用户列表, 总记录数)
@@ -259,7 +259,7 @@ class CRUDUser(CRUDBase[User, UserCreate, UserCvUpdate]):
         data =[]
         # 🧹 转为响应结构
         for u,avat in rows:
-            user_with_avatar = UserWithAvatarOut.model_validate(u)
+            user_with_avatar = UserForAdmin.model_validate(u)
             if avat:
                 user_with_avatar.avatar = avat.url
             data.append(user_with_avatar)
