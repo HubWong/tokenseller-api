@@ -32,7 +32,7 @@ class Settings(BaseSettings):
     # 数据库创建在项目根目录（token seller 文件夹）
     
     PROJECT_ROOT: str = os.path.dirname(os.path.dirname(os.path.dirname(BASE_DIR)))  # backend/app/core -> backend/app -> backend -> token seller
-    ONE_API_MASTERKEY :str = os.getenv("ONE_API_MASTER_KEY","sk-AQXahBqz3MbEKKBl55941dBe8c5248368aCd4215B8422eFc")
+    ONE_API_MASTERKEY :str = os.getenv("ONE_API_MASTER_KEY","sk-LpE8Zq7xhrwF3yrYFeBd1c5a8eF3458f9a9b23C3123a2b9f")
     ONEAPI_URL:str =os.getenv('ONEAPI_BASE',"http://localhost:3000")
     ONEAPI_CHAT_URL: str = os.getenv("ONEAPI_CHAT_URL", "https://one-api-production-73ea.up.railway.app/v1/chat/completions")
     ONEAPI_ACCESS_TOKEN :str = 'd787ddd3d2da492f80483076533cfe3a'
