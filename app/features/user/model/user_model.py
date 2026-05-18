@@ -28,6 +28,7 @@ class User(Base, TimestampMixin):
     oauth_id = Column(String(100),nullable=True)
     parent_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     balance = Column(Float, default=0.0)
+    user_ip = Column(String(20), nullable=True)
     
 class UserSettings(Base,TimestampMixin):
     __tablename__ = "user_settings"

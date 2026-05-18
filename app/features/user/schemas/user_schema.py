@@ -87,6 +87,7 @@ class UserForAdmin(BaseUser):
     email: Optional[EmailStr] = None
     role: Optional[str] = None
     is_active: Optional[bool] = None
+    user_ip:Optional[str] = 'unknown'
         
 class UserInDbWithPwd(UserInDB):
     hashed_password: str

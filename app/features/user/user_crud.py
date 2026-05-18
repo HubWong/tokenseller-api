@@ -247,7 +247,7 @@ class CRUDUser(CRUDBase[User, UserCreate, UserCvUpdate]):
 
         # 🧮 分页：先查总数（独立 COUNT 查询，精确）
         count_stmt = select(func.count()).select_from(User)
-        total_result: Result = await db.execute(count_stmt)
+        total_result = await db.execute(count_stmt)
         total = total_result.scalar_one()
 
         # 📄 分页数据：LIMIT + OFFSET
@@ -258,10 +258,8 @@ class CRUDUser(CRUDBase[User, UserCreate, UserCvUpdate]):
         rows = result.all()  # List[Tuple[User, Photo | None]]
         data =[]
         # 🧹 转为响应结构
-        for u,avat in rows:
-            user_with_avatar = UserForAdmin.model_validate(u)
-            if avat:
-                user_with_avatar.avatar = avat.url
+        for u in rows:
+            user_with_avatar = UserForAdmin.model_validate(u)            
             data.append(user_with_avatar)
         return data, total
 
