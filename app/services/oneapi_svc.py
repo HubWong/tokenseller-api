@@ -154,6 +154,7 @@ class OneAPISvc:
     @lru_cache(maxsize=128)
     def _get_default_headers(api_key: str) -> Dict[str, str]:
         """缓存请求头，避免重复创建字典"""
+        print("[****]api_key:", api_key)
         return {
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
