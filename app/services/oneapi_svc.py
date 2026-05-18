@@ -33,7 +33,7 @@ from app.core.abc_biz import  ConsumeService
 
 logger = logging.getLogger(__name__)
 
-MASTER_KEY = settings.ONE_API_MASTERKEY
+MASTER_KEY = 'sk-LpE8Zq7xhrwF3yrYFeBd1c5a8eF3458f9a9b23C3123a2b9f'
 create_userapi = f'{settings.ONEAPI_URL}/api/user/'
 access_token =f'{settings.ONEAPI_ACCESS_TOKEN}'
 MODEL_MAP = {
