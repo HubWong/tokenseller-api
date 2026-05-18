@@ -233,7 +233,7 @@ class OneAPISvc:
         url = url or self.base_url
         json_data = json_data or {}
         tracker = UsageTracker(json_data.get("messages"), json_data.get("model"))
-
+        print('requesting url==>',self.base_url)
         resp = await self.client.request(
             method=method,
             url=url,
