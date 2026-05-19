@@ -16,6 +16,8 @@ class PriceRepo:
     async def create_pricing(
         self,
         model_name: str,
+        input_cost: float,
+        output_cost: float,
         input_price: float,
         output_price: float,
         currency: str = "USD",
@@ -24,6 +26,8 @@ class PriceRepo:
         """Create a new model pricing record"""
         pricing = ModelPricing(
             model_name=model_name,
+            input_cost=input_cost,
+            output_cost=output_cost,
             input_price=input_price,
             output_price=output_price,
             currency=currency,

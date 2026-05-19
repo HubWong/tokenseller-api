@@ -2,7 +2,6 @@
 import decimal
 from typing import Any, List,Optional, Tuple
 from fastapi import APIRouter, Depends
-from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.deps import admin_required, get_buy_svc, get_current_user, get_order_rep
 from app.features.biz.order.order_schema import PurchaseRequest
 from app.features.user.model.user_model import User
@@ -10,7 +9,6 @@ from app.features.db_base import ApiResp, PagedResp
 from app.features.biz.order.order_repo import OrderRepo
 from app.features.biz.order.order_schema import  OrderInDBBase
 from app.core.abc_biz import BuyService
-from app.core.security import validate_order
 from app.features.user.schemas.user_role import UserRole
 
 router = APIRouter(prefix="/orders", tags=["orders"])
@@ -34,8 +32,8 @@ async def delete_order(order_id: int, user:User= Depends(admin_required),  order
     return ApiResp(success=r, message="Order cancelled" if r else "Order not found")
 
 
-@router.get('/{order_id}', response_model=ApiResp[OrderInDBBase])
-async def get_order(order_id: int, order_repo: OrderRepo = Depends(get_order_rep)) -> ApiResp[OrderInDBBase]:
+@router.get('/{order_id}', response_model=ApiResp)
+async def get_order(order_id: int, order_repo: OrderRepo = Depends(get_order_rep)) -> ApiResp:
     order = await order_repo.get_by_id(order_id)
     if not order:
         return ApiResp(success=False, message="Order not found")

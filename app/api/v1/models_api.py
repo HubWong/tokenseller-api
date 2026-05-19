@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from typing import Any, List, Optional
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field
+from app.features.biz.order.order_schema import ModelPricingCreate, ModelPricingResponse, ModelPricingUpdate
 from app.core.deps import get_price_repo, admin_required
 from app.features.biz.order.price_repo import PriceRepo
 from app.features.db_base import ApiResp
@@ -9,32 +9,6 @@ from app.features.db_base import ApiResp
 router = APIRouter(prefix="/models", tags=["models"])
 
 
-# Request/Response Schemas
-class ModelPricingCreate(BaseModel):
-    model_name: str = Field(..., description="Model name")
-    input_price: float = Field(..., gt=0, description="Input price per 1K tokens")
-    output_price: float = Field(..., gt=0, description="Output price per 1K tokens")
-    currency: str = Field(default="USD", description="Currency code")
-    is_active: bool = Field(default=True, description="Whether the model is active")
-
-
-class ModelPricingUpdate(BaseModel):
-    input_price: Optional[float] = Field(None, gt=0, description="Input price per 1K tokens")
-    output_price: Optional[float] = Field(None, gt=0, description="Output price per 1K tokens")
-    currency: Optional[str] = Field(None, description="Currency code")
-    is_active: Optional[bool] = Field(None, description="Whether the model is active")
-
-
-class ModelPricingResponse(BaseModel):
-    id: int
-    model_name: str
-    input_price: float
-    output_price: float
-    currency: str
-    is_active: bool
-
-    class Config:
-        from_attributes = True
 
 
 
@@ -71,12 +45,13 @@ async def create_model(
 ):
     """Create a new model pricing record (admin only)"""
     try:
-        # Check if model already exists
         existing = await price_repo.get_pricing_by_model(model_data.model_name)
         if existing:
             return ApiResp(success=False, message=f"Model {model_data.model_name} already exists")
 
         model = await price_repo.create_pricing(
+            input_cost=model_data.input_cost,
+            output_cost=model_data.output_cost,
             model_name=model_data.model_name,
             input_price=model_data.input_price,
             output_price=model_data.output_price,

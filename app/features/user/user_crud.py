@@ -22,7 +22,7 @@ from app.core.security import (
     get_password_hash,    
     verify_password    
 )
-from app.services.tools_svc import check_port_open
+from app.services.tools_svc import check_api_reachable
 from app.features.biz.apikey.apikey_crud import apikey_crud
 from app.services.email_svc import smtp
 from app.features.biz.user_balance.transaction_reop import TransactionRepo
@@ -50,27 +50,16 @@ class CRUDUser(CRUDBase[User, UserCreate, UserCvUpdate]):
         return user_id  
 
     async def get_parent(self,db:AsyncSession,user_id:int)->Optional[int]:
-        stmt = select(User).where(User.id == user_id)
+        stmt = select(User.parent_id).where(User.id == user_id)
         result = await db.execute(stmt)
-        user = result.scalars().first()
-        return user.parent_id
+        pid= result.scalar_one_or_none()
+        return pid
 
     async def get_by_id(self, db: AsyncSession, id: int)->Optional[User]:
         stmt = select(User).where(User.id==id)
         result = await db.execute(stmt)
         return result.scalars().first()      
-    
-
-    async def get_user_details_photos(self, db: AsyncSession, uid: int) -> Optional[UserInDbPhotos]:
-        '''
-        query user with photos and avatars
-        '''
-        stmt = select(User).options(joinedload(User.photos)).where(User.id == uid)
-        result = await db.execute(stmt)
-        user = result.scalars().first()
-        if not user:
-            return None
-        return UserInDbPhotos.model_validate(user)
+      
 
     async def create(self,one_api_svc:OneAPISvc, transaction_repo:TransactionRepo, db: AsyncSession, *, obj_in: UserCreate) -> ApiResp[dict|bool]:
         try:
@@ -100,7 +89,7 @@ class CRUDUser(CRUDBase[User, UserCreate, UserCvUpdate]):
                     setattr(db_obj,'parent_id',inviter_id)
             db.add(db_obj)
             await db.commit()
-            await db.refresh(db_obj)  # ✅ 关键！确保 id 等 DB 生成字段已加载
+            await db.refresh(db_obj) 
             await transaction_repo.create_transaction(
                 session=db,
                 maker_id=int(getattr(db_obj,'id')),
@@ -109,8 +98,10 @@ class CRUDUser(CRUDBase[User, UserCreate, UserCvUpdate]):
             )
             await db.commit()
             await apikey_crud.generate_api_key(db=db,user_id= int(getattr(db_obj,'id')))
-            if check_port_open('localhost',3000,3):
-                await one_api_svc.create_oneapi_user(username=username,pwd=obj_in.password)
+            if check_api_reachable(settings.ONEAPI_URL,3):
+                await one_api_svc.create_oneapi_user(username=username,
+                                                     pwd=obj_in.password,
+                                                     access_token=settings.ONEAPI_ACCESS_TOKEN)
             return ApiResp(success=True, data=True, message='')
 
         except IntegrityError as e:
@@ -154,7 +145,7 @@ class CRUDUser(CRUDBase[User, UserCreate, UserCvUpdate]):
         res = await super().update(db=db, db_obj=db_obj, obj_in=obj_in)
         if res:
             # 更新用户会话信息（如在 socket 连接中）           
-            await self._update_user_session(res, pc_id=db_obj.pc_id)        
+            await self._update_user_session(res, pc_id=getattr(db_obj,'pc_id',''))        
         return res
 
     async def login_user(
@@ -163,9 +154,9 @@ class CRUDUser(CRUDBase[User, UserCreate, UserCvUpdate]):
         user = await self.authenticate(db, email=emailOrTel, password=password, pc_id=pc_id)
         if not user:
             return ApiResp(success=False, message="Invalid credentials", data=None)
-        if not user.is_active:
+        if user.is_active is False:
             return ApiResp(success=False, message="User is inactive", data=None)
-        exp, refresh_token = create_refresh_token(user.id)        
+        exp, refresh_token = create_refresh_token(int(str(getattr(user, 'id'))))        
         await token_crud.create_token(db, user_id=int(str(user.id)), token=refresh_token, expire_at=exp)
         loginResp = UserLoginResp.model_validate(user)
         user_role = getattr(user,'role',UserRole.USER).value
@@ -215,7 +206,7 @@ class CRUDUser(CRUDBase[User, UserCreate, UserCvUpdate]):
         page: int = 1,       
         sort_by: str = "id",        # 支持排序字段：id, name, created_at
         sort_order: str = "asc",    # asc / desc
-    ) -> Tuple[int, Sequence[UserForAdmin]]:
+    ) -> Tuple[Sequence[UserForAdmin], int]:
         
         """
         返回：(用户列表, 总记录数)
@@ -359,7 +350,8 @@ class CRUDUser(CRUDBase[User, UserCreate, UserCvUpdate]):
             return ApiResp(success=False, message="Token invalid or expired")
 
         user = await self.get_by_email(db, emailOrTel=email)
-        if not user or user.reset_pwd_token != token:
+        rpt = getattr(user, "reset_pwd_token", None)
+        if user is None or rpt != token:
             return ApiResp(success=False, message="Invalid token")
         pwd = get_password_hash(new_pwd)
         setattr(user, "hashed_password", pwd)

@@ -2,7 +2,7 @@ from typing import Optional,Dict
 from pydantic import BaseModel
 from datetime import datetime, timedelta
 from enum import Enum
-
+from pydantic import BaseModel, Field
 
 '''
 PENDING (创建订单) 
@@ -31,14 +31,24 @@ class PurchaseRequest(BaseModel):
     pay_way: int
    
 
-class ModelPricingResponse(BaseModel):
-    model_name: str
-    input_price: float
-    output_price: float
-    currency: str
-    level: Optional[int] = None
-    is_active: bool
-    
+
+
+
+class ModelPricingUpdate(BaseModel):
+    input_cost: Optional[float] = Field(None, gt=0, description="Input cost per 1K tokens")
+    output_cost: Optional[float] = Field(None, gt=0, description="Output cost per 1K tokens")
+    input_price: Optional[float] = Field(None, gt=0, description="Input price per 1K tokens")
+    output_price: Optional[float] = Field(None, gt=0, description="Output price per 1K tokens")
+    currency: Optional[str] = Field(None, description="Currency code")
+    is_active: Optional[bool] = Field(None, description="Whether the model is active")
+
+# Request/Response Schemas
+class ModelPricingCreate(ModelPricingUpdate):
+    model_name: str = Field(..., description="Model name")   
+
+class ModelPricingResponse(ModelPricingCreate):
+    id: int   
+
     class Config:
         from_attributes = True
 

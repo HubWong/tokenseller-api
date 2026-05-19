@@ -1,5 +1,5 @@
-from sqlalchemy import Boolean, Column, String, Integer, ForeignKey, Text, Enum,DateTime, func
-
+from sqlalchemy import Boolean, Column, String, Integer, ForeignKey, Float
+from sqlalchemy.ext.asyncio import AsyncSession
 from app.features.db_base import TimestampMixin
 from app.core.database import Base
 
