@@ -51,12 +51,6 @@ def resolve_model(tier: str) -> str:
     return models[0] if models else "deepseek-chat"
 
 
-class OneAPIError(Exception):
-    pass
-
-class RetryableAPIError(OneAPIError):
-    pass
-
 
 # ================= 异步迭代器包装器 =================
 class StreamIterator:
@@ -121,6 +115,12 @@ class RetryableAPIError(Exception):
 
 
 class OneAPIError(Exception):
+    pass
+
+class OneAPIError(Exception):
+    pass
+
+class RetryableAPIError(OneAPIError):
     pass
 
 
