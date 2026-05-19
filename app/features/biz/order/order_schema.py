@@ -30,7 +30,17 @@ class PurchaseRequest(BaseModel):
     amount:float
     pay_way: int
    
-     
+
+class ModelPricingResponse(BaseModel):
+    model_name: str
+    input_price: float
+    output_price: float
+    currency: str
+    level: Optional[int] = None
+    is_active: bool
+    
+    class Config:
+        from_attributes = True
 
 class TokenBalanceResponse(BaseModel):
     api_key: str

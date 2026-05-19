@@ -110,14 +110,17 @@ class Settings(BaseSettings):
     BILL_PRICE_SET :list[float] = [10,25,50,100,200,500]
     PROFILE_RATE : float = 3.2  # 销售价格 = 成本 * PROFILE_RATE
     RESEND_API_KEY: str = os.getenv("RESEND_API_KEY", "")
+    INPUT_TOKEN_PRICE: float = 0.0001  # 每个token的成本价格，单位为美元
+    OUTPUT_TOKEN_PRICE: float = 0.001  # 每个token的销售价格，单位为美元
 
 settings = Settings()
 
+user_multiplier = {
+  "free"    : 1.5,
+  "vip"     : 1.0,
+  "reseller": 0.8
+}
 
-txt_words = ['mind', 'vocal', 'hip', 'catalog', 'nature', 
-             'model', 'cup', 'estate', 'common', 'health',
-             'cousin', 'basket'
-            ] 
 
 
 if __name__ == "__main__":

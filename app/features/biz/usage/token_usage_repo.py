@@ -2,8 +2,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime, timedelta,date
 from collections.abc import Sequence
 from sqlalchemy import func, select, desc
-from typing import List, Any,Dict
+from typing import Optional, Any,Dict
 from app.features.biz.usage.model import TokenUsageLog
+from app.features.biz.usage.schema import TokenUsageRecord
 from app.features.biz.user_balance.schemas import DashboardStatsResponse
 from app.core.config import settings
 
@@ -37,7 +38,7 @@ class TokenUsageRepo:
             return None
         
     async def add_token_log(self,db:AsyncSession,resp_data:str, uid :int,json_data:Dict):
-        request = TokenUsageLog(
+        new_log = TokenUsageLog(
             user_id=uid,
             request_data=str(json_data),
             is_stream = json_data.get('stream',False),
@@ -47,20 +48,24 @@ class TokenUsageRepo:
             amount =0
         )
         try:
-            db.add(request)
+            db.add(new_log)
             await db.commit()
-            await db.refresh(request)
+            await db.refresh(new_log)
         except Exception as ex:
             await db.rollback()
             print("error:", str(ex))
-        return request
+            return None
+        return new_log
  
         
-    async def get_usage_log_by_id(self,db:AsyncSession,logid:int):
+    async def get_usage_log_by_id(self,db:AsyncSession,logid:int) -> Optional[TokenUsageRecord]:
         result = await db.execute(
             select(TokenUsageLog).where(TokenUsageLog.id == logid)
         )
-        return result.scalars().first()
+        log = result.scalars().first()
+        if log:
+            return TokenUsageRecord.model_validate(log)
+        return None
 
     async def get_monthly_usage(self, user_id: int) -> float:
         """

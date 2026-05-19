@@ -91,6 +91,16 @@ class ModelPricing(Base, TimestampMixin):
         index=True,
         nullable=False
     )
+
+    input_cost: Mapped[float] = mapped_column(
+        Numeric(10, 6),
+        nullable=True
+    )
+    output_cost: Mapped[float] = mapped_column(
+        Numeric(10, 6),
+        nullable=True
+    )
+
     input_price: Mapped[float] = mapped_column(
         Numeric(10, 6),
         nullable=False

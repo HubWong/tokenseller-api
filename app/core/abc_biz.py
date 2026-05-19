@@ -3,7 +3,7 @@ from datetime import datetime
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 import redis.asyncio as redis
-from app.core.config import settings
+from decimal import Decimal
 from app.core.abc import BuyServiceABC, CommissionServiceABC, ConsumeServiceABC, BaseServiceABC
 from app.core.database import get_db, to_dict, get_db_manual
 from app.features.biz.order.order_repo import OrderRepo
@@ -78,15 +78,14 @@ class ConsumeService(BaseService, ConsumeServiceABC):
     async def charge(self, user_id: int, usage: dict, token_usage: TokenUsageLog, request_model: str, session: AsyncSession):
         inp_tk = usage.get('prompt_tokens', 0)
         outp_tk = usage.get('completion_tokens', 0)
-
-        stmt = select(TokenUsageLog).where(TokenUsageLog.id == token_usage.id)
-        token_usage = (await session.execute(stmt)).scalar_one_or_none()
-        if not token_usage:
-            logger.error(f"Token usage log not found for id: {token_usage.id}")
-            return
-
-        cost = await self.calcu.tokens_to_cost(inp_tk, outp_tk, request_model)
-        sale_price = float(cost) * settings.PROFILE_RATE
+       
+        model_price = self.calcu.query_price_table (request_model)
+        if model_price is None:
+            logger.warning(f"Model {request_model} not found in price table, using default price")
+            raise Exception("Model not found in price table")
+        
+        cost = self.calcu.tokens_to_cost(input_tokens=inp_tk, output_tokens=outp_tk, model_price=model_price)
+        sale_price = self.calcu.tokens_to_revenue(input_tokens=inp_tk, output_tokens=outp_tk, model_price=model_price)
         token_usage.status = 'completed'
         token_usage.updated_at = datetime.now()
         token_usage.memo = f'api request:{str(usage)}'
@@ -95,7 +94,7 @@ class ConsumeService(BaseService, ConsumeServiceABC):
         token_usage.amount = inp_tk + outp_tk
         token_usage.provider_cost = cost
         token_usage.sale_price = sale_price # 如果有加价策略，可以在这里修改
-        token_usage.profit = sale_price - float(cost)
+        token_usage.profit = Decimal(sale_price) - Decimal(cost)
 
 
         if cost > 0:

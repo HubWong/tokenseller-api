@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Integer, String, Column, ForeignKey, DateTime, Text
+from sqlalchemy import Boolean, Integer, String, Column, DateTime, Text
 from sqlalchemy.types import Float,Numeric
 from app.features.db_base import TimestampMixin
 from app.core.database import Base
