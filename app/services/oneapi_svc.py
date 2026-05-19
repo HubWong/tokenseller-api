@@ -5,8 +5,6 @@ from decimal import Decimal
 from functools import lru_cache
 from ast import Dict
 from typing import Any, Dict, List, Optional, Tuple, AsyncIterator
-
-# 第三方库
 import httpx
 import tiktoken
 from fastapi import Request, HTTPException
@@ -19,16 +17,12 @@ from tenacity import (
     retry_if_exception_type,
 )
 
-# Starlette / 项目配置
 from starlette.requests import ClientDisconnect
 from app.core.config import settings
 
 # 项目内部模块
 from app.features.biz.usage.token_usage_repo import TokenUsageRepo
 from app.features.biz.apikey.apikey_crud import apikey_crud
-
-# 旧版 starlette 使用这个
-
 from app.core.abc_biz import  ConsumeService
 
 logger = logging.getLogger(__name__)
