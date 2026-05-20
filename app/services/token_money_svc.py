@@ -77,8 +77,8 @@ class TokenCostCalculator:
         model_price:ModelPricingResponse,
     ) -> Decimal:       
 
-        input_cost = model_price.input_cost
-        output_cost = model_price.output_cost
+        input_cost = model_price.input_cost or model_price.input_price
+        output_cost = model_price.output_cost or model_price.output_price
 
         if input_cost is None or output_cost is None:
             raise ValueError("Model cost not found")

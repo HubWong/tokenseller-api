@@ -110,11 +110,11 @@ class ConsumeService(BaseService, ConsumeServiceABC):
 
         if cost > 0:
             meta = {"model": request_model, "usage": usage}
-            await self.transaction.consume_session(session=session, maker_id=user_id, amount=-sale_price, transaction_type=TransactionType.CONSUME, meta=meta)
+            await self.transaction.consume_session(session=session, maker_id=user_data.user_id, amount=-sale_price, transaction_type=TransactionType.CONSUME, meta=meta)
             await self.transaction.consume_session(session=session, maker_id=0, amount=sale_price, transaction_type=TransactionType.SYSINCOME, meta=meta)
 
         # 必须在 commit 前执行，确保与消费在同一事务
-        await self.commission.distribute(from_user=user_id, amount=cost, usage_id=token_usage.id, session=session)
+        await self.commission.distribute(from_user=user_data.user_id, amount=cost, usage_id=token_usage.id, session=session)
         await session.commit()
         return cost
 
