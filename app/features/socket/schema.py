@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import List, Optional,Generic,TypeVar, Dict, Set,Any
+from typing import List, Optional,Generic,TypeVar,Any
 from datetime import datetime
 from app.features.user.schemas.user_schema import SocketUser
 from enum import Enum

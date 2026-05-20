@@ -2,7 +2,6 @@ from datetime import date, datetime, timezone
 from typing import Optional, List, Any, Tuple
 from sqlalchemy import or_, case, func, select, update
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import joinedload,selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 from collections.abc import Sequence
 from app.features.biz.user_balance.models import TransactionType
