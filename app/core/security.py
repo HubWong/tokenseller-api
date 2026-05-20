@@ -13,10 +13,6 @@ import secrets
 SECRET_KEY = settings.SECRET_KEY
 ALGORITHM = settings.SECRET_KEY_ALGORITHM
 
-async def validate_order(order_id: int):
-    # TODO: validate order from payoneer callback
-    # for now just return True
-    return True
 
 class CustomOAuth2Form(OAuth2PasswordRequestForm):
     def __init__(
@@ -53,8 +49,7 @@ def create_access_token(
     
     to_encode = {"exp": expire, "sub": str(subject),'role':role, "type": "access"}
     if extra_claims:
-        to_encode.update(extra_claims)
-    
+        to_encode.update(extra_claims)    
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 def create_refresh_token(
