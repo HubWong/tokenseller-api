@@ -112,13 +112,16 @@ class RetryableAPIError(OneAPIError):
 class OneAPISvc:
     def __init__(
         self,
-        base_url: str = settings.ONEAPI_CHAT_URL,
-        api_key: str = "",
+        base_url: str = settings.ONEAPI_URL,
+        api_key: Optional[str] = MASTER_KEY,
         timeout: int = 30,
     ):
         # 清理URL，统一格式
         self.base_url = base_url.rstrip("/")
-        self.api_key = api_key or MASTER_KEY
+        self.chat_url = f"{self.base_url}/chat/completions"
+        self.embeddings_url = f"{self.base_url}/embeddings"
+        self.models_url = f"{self.base_url}/models"
+        self.api_key = api_key 
         self.timeout = httpx.Timeout(timeout)
 
         # 连接池配置：更合理的生产参数，避免资源浪费
@@ -176,7 +179,7 @@ class OneAPISvc:
         async def _inner_gen():
             async with self.client.stream(
                 "POST",
-                self.base_url,
+                self.chat_url,
                 headers=self._headers(),
                 json={**payload, "stream": True},
             ) as response:
@@ -216,7 +219,7 @@ class OneAPISvc:
         url: Optional[str] = None,
     ) -> Tuple[Dict, Dict]:
         """统一请求方法：增强健壮性"""
-        url = url or self.base_url
+        url = url or self.chat_url
         json_data = json_data or {}
         tracker = UsageTracker( messages=json_data.get("messages"), model=json_data.get("model",'default'))
         logger.debug("requesting url => %s", url)
@@ -250,13 +253,13 @@ class OneAPISvc:
     async def embeddings(self, model: str, input_text: str | List[str]) -> Tuple[Dict, Dict]:
         return await self._request(
             method="POST",
-            url=f"{self.base_url}/embeddings",
+            url=self.embeddings_url,
             json_data={"model": model, "input": input_text},
         )
 
     async def models(self) -> Tuple[Dict, Dict]:
         return await self._request(method="GET", 
-                                   url=f"{self.base_url}/models",
+                                   url=self.models_url,
                                    json_data={})
 
     async def create_oneapi_user(self, username: str, pwd: str, access_token: str) -> Dict:

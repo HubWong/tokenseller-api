@@ -10,7 +10,6 @@ from app.core.deps import get_oneapi_svc,get_consume_svc, get_token_usage_rep
 from app.core.abc_biz import ConsumeService
 from app.features.biz.usage.token_usage_repo import TokenUsageRepo
 from app.services.tools_svc import check_api_reachable
-from app.core.config import settings
 
 router = APIRouter(prefix="/chat", tags=["AI chat gateway"])
 
