@@ -7,6 +7,11 @@ from app.features.biz.order.order_schema import ModelPricingResponse
 PRICE_UNIT = Decimal("1000000")
 PRECISION = Decimal("0.000001")
 
+user_multiplier = {
+  "free"    : 1.5,
+  "vip"     : 1.0,
+  "reseller": 0.8
+}
 class TokenCostCalculator:
     def __init__(self,price_db):       
         self.prices =price_db
@@ -21,8 +26,9 @@ class TokenCostCalculator:
 
      
     def tokens_to_revenue(self, input_tokens: int, 
-                          output_tokens: int,
-                          model_price:ModelPricingResponse) -> Decimal:
+                          output_tokens: int,                        
+                          model_price:ModelPricingResponse,
+                          user_tier:str = "free") -> Decimal:
         """根据 token 数量和模型计算收入"""        
 
         input_price = model_price.input_price
@@ -30,11 +36,14 @@ class TokenCostCalculator:
         if input_price is None or output_price is None:
             raise ValueError("Model price not found")
 
-        revenue = (
-            (Decimal(input_tokens) * input_price) +
-            (Decimal(output_tokens) * output_price)
+        revenue = Decimal(
+            input_tokens * input_price +
+            output_tokens * output_price
         ) / PRICE_UNIT
 
+         
+        revenue *=Decimal(user_multiplier[user_tier])
+         # 其他用户正常收入
         return revenue.quantize(PRECISION, rounding=ROUND_HALF_UP)
 
 
@@ -51,9 +60,9 @@ class TokenCostCalculator:
         if input_price is None or output_price is None:
             raise ValueError("Model price not found")
 
-        cost = (
-            (Decimal(input_tokens) * input_price) +
-            (Decimal(output_tokens) * output_price)
+        cost = Decimal(
+            (input_tokens * input_price) +
+            (output_tokens * output_price)
         ) / PRICE_UNIT
 
        
@@ -71,7 +80,7 @@ class TokenCostCalculator:
         if amount <= 0:
             raise ValueError("invalid amount")
 
-        price_config: ModelPricingResponse = await self.query_price_table(model)
+        price_config = await self.query_price_table(model)
         if not price_config:
             raise ValueError("Model price not found")
 
@@ -87,7 +96,7 @@ class TokenCostCalculator:
         if price is None or price <= 0:
             raise ValueError("invalid token price")
 
-        tokens = (Decimal(str(amount)) * PRICE_UNIT) / price
+        tokens = (amount * PRICE_UNIT) / Decimal(price)
 
         return int(
             tokens.to_integral_value(

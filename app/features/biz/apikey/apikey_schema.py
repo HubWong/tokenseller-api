@@ -1,7 +1,5 @@
 from typing import Optional
 from pydantic import BaseModel
-from datetime import datetime
-from enum import IntEnum
 
 """
  "id": k.id,
@@ -17,11 +15,13 @@ from enum import IntEnum
 
 class ApiKeyResp(BaseModel):
     id:int
-    status: str
-    used_tokens:float
+    user_id:int
+    key:str
+    name:str
     tier:str
-    created_at:str
-    key: str
-    key_title: str
-    status: str
-    quota: float
+    status:str
+    rpm_limit:int
+
+    class Config:
+        from_attributes = True
+     

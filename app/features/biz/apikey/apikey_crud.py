@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Optional
 from aiohttp import http_exceptions
 from aiohttp.http_exceptions import HttpBadRequest
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -44,39 +44,33 @@ class CRUDApiKey(CRUDBase[ApiKey, ApiKeyResp, ApiKeyResp]):
             print("error:", str(ex))
         return key   
      
-    async def auth_user(self,db: AsyncSession, request: Request,token_respo:TokenUsageRepo) -> dict:
+    async def auth_user(self,db: AsyncSession, request: Request,token_respo:TokenUsageRepo) -> ApiKey:
         auth = request.headers.get("Authorization")
         if not auth:
             raise HTTPException(401, "Missing API Key")
         key = auth.replace("Bearer ", "")
         # 假设 CRUDApiKey 已正确导入
         user = await self.get_user_from_key(db=db, key=key)
-        if not user:
-            raise HTTPException(403, "Invalid API Key")
-        _,_,_,left = await token_respo.get_request_log(uid=user['user_id'])
+        uid = getattr(user, "id") if user else None
+        if user is None or uid is None:
+            raise HTTPException(403, "Invalid API Key")        
+        
+        _,_,_,left = await token_respo.get_request_log(uid=int(uid))
         if left == 0:
             raise HTTPException(status_code=402,detail = "No token left")
         return user
 
     
-    async def get_user_from_key(self,db:AsyncSession, key: str):
+    async def get_user_from_key(self,db:AsyncSession, key: str)->Optional[ApiKey]:
         # 1. 构建查询语句
-        stmt = select(ApiKey).where(ApiKey.key == key)
-        
+        stmt = select(ApiKey).where(ApiKey.key == key)        
         # 2. 异步执行查询 (await)
-        result = await db.execute(stmt)
-        
+        result = await db.execute(stmt)        
         # 3. 获取第一条结果
-        api_key = result.scalars().first()
+        api_key = result.scalar_one_or_none()
         
-        if not api_key or api_key.status !='active':
-            return None
-
-        return {
-            "user_id": api_key.user_id,           
-            "tier": api_key.tier,
-            "api_key_obj": api_key,
-        }
+        return api_key
+    
 
     async def get_keys(self, db: AsyncSession, user_id: int) -> ApiResp:
         try:

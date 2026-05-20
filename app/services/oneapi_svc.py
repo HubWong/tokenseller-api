@@ -22,6 +22,7 @@ from app.core.config import settings
 # 项目内部模块
 from app.features.biz.usage.token_usage_repo import TokenUsageRepo
 from app.features.biz.apikey.apikey_crud import apikey_crud
+from app.features.biz.apikey.apikey_schema import ApiKeyResp
 from app.core.abc_biz import ConsumeService
 
 logger = logging.getLogger(__name__)
@@ -59,7 +60,7 @@ class StreamIterator:
 
 # ================= Token 统计器 =================
 class UsageTracker:
-    def __init__(self, messages: List[dict] | None, model: str = "gpt-3.5-turbo"):
+    def __init__(self, messages: Optional[List[dict]] = None, model: str = "gpt-3.5-turbo"):
         self.messages = messages or []
         self.model = model
         self.usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
@@ -217,7 +218,7 @@ class OneAPISvc:
         """统一请求方法：增强健壮性"""
         url = url or self.base_url
         json_data = json_data or {}
-        tracker = UsageTracker(json_data.get("messages"), json_data.get("model"))
+        tracker = UsageTracker( messages=json_data.get("messages"), model=json_data.get("model",'default'))
         logger.debug("requesting url => %s", url)
         resp = await self.client.request(
             method=method,
@@ -254,7 +255,9 @@ class OneAPISvc:
         )
 
     async def models(self) -> Tuple[Dict, Dict]:
-        return await self._request(method="GET", url=f"{self.base_url}/models")
+        return await self._request(method="GET", 
+                                   url=f"{self.base_url}/models",
+                                   json_data={})
 
     async def create_oneapi_user(self, username: str, pwd: str, access_token: str) -> Dict:
         """全局 access_token 改为参数注入，完善异常处理"""
@@ -287,7 +290,7 @@ class OneAPISvc:
     async def __aenter__(self):
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(self):
         await self.close()
 
     async def chat_llm(
@@ -300,7 +303,14 @@ class OneAPISvc:
     ):
         """核心聊天接口：结构优化、异常安全、日志增强"""
         # 1. 认证与参数解析
-        key_data = await apikey_crud.auth_user(db=db, request=request, token_respo=token_repo)
+        rst = await apikey_crud.auth_user(db=db, request=request, token_respo=token_repo)
+        
+        if rst is None:
+            raise HTTPException(status_code=403,detail = "Invalid API Key")
+        
+        key_data = ApiKeyResp.model_validate(rst)
+
+
         body = await request.json()
         messages = body.get("messages", [])
 
@@ -308,7 +318,7 @@ class OneAPISvc:
             raise HTTPException(status_code=400, detail="messages cannot be empty")
 
         # 2. 模型与参数组装
-        tier = key_data["tier"]
+        tier = key_data.tier
         model = resolve_model(tier)
         common_params = {
             "model": model,
@@ -320,7 +330,7 @@ class OneAPISvc:
         # 3. 日志记录
         token_log = await token_repo.add_token_log(
             db=db,
-            uid=key_data["user_id"],
+            uid=key_data.user_id,
             json_data=common_params,
             resp_data="api request received",
         )
@@ -331,7 +341,7 @@ class OneAPISvc:
 
             await consume_svc.charge(
                 token_usage=token_log,
-                user_id=key_data["user_id"],
+                user_data=key_data,
                 usage=usage,
                 request_model=model,
                 session=db,
@@ -349,9 +359,9 @@ class OneAPISvc:
                 usage = stream_iter.tracker.finalize("".join(stream_iter.full_text))
 
             except ClientDisconnect:
-                logger.info("Client disconnected | user_id=%s", key_data["user_id"])
+                logger.info("Client disconnected | user_id=%s", key_data.user_id)
             except Exception as e:
-                logger.error("Stream error | user_id=%s, error=%s", key_data["user_id"], str(e))
+                logger.error("Stream error | user_id=%s, error=%s", key_data.user_id, str(e))
                 yield f"data: {json_lib.dumps({'error': 'stream error'})}\n\n"
             finally:
                 # 确保计费一定执行
@@ -359,14 +369,14 @@ class OneAPISvc:
                     try:
                         await consume_svc.charge(
                             token_usage=token_log,
-                            user_id=key_data["user_id"],
+                            user_data=key_data,
                             usage=usage,
                             request_model=model,
                             session=db,
                         )
                     except Exception as charge_error:
                         logger.critical(
-                            "Charge failed | user_id=%s, error=%s", key_data["user_id"], str(charge_error)
+                            "Charge failed | user_id=%s, error=%s", key_data.user_id, str(charge_error)
                         )
 
         return StreamingResponse(

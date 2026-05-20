@@ -12,6 +12,7 @@ from app.features.biz.user_balance.models import Transaction, TransactionType
 from app.features.biz.usage.model import TokenUsageLog
 from app.features.biz.usage.token_usage_repo import TokenUsageRepo
 from app.features.user.model.user_model import User
+from app.features.biz.apikey.apikey_schema import ApiKeyResp
 from app.services.token_money_svc import TokenCostCalculator
 
 logger = logging.getLogger(__name__)
@@ -75,20 +76,24 @@ class ConsumeService(BaseService, ConsumeServiceABC):
         self.commission = CommissionService
         self.calcu = PriceCal
 
-    async def charge(self, user_id: int, usage: dict, token_usage: TokenUsageLog, request_model: str, session: AsyncSession):
+    async def charge(self, user_data: ApiKeyResp, usage: dict, token_usage: TokenUsageLog, request_model: str, session: AsyncSession):
         inp_tk = usage.get('prompt_tokens', 0)
         outp_tk = usage.get('completion_tokens', 0)
        
-        model_price = self.calcu.query_price_table (request_model)
+        model_price = await self.calcu.query_price_table (request_model)
         if model_price is None:
             logger.warning(f"Model {request_model} not found in price table, using default price")
             raise Exception("Model not found in price table")
         
         cost = self.calcu.tokens_to_cost(input_tokens=inp_tk, output_tokens=outp_tk, model_price=model_price)
-        sale_price = self.calcu.tokens_to_revenue(input_tokens=inp_tk, output_tokens=outp_tk, model_price=model_price)
+        sale_price = self.calcu.tokens_to_revenue(input_tokens=inp_tk,
+                                                  output_tokens=outp_tk, 
+                                                  model_price=model_price,
+                                                  user_tier=user_data.tier 
+                                                )
         token_usage.status = 'completed'
         token_usage.updated_at = datetime.now()
-        token_usage.memo = f'api request:{str(usage)}'
+        token_usage.memo = f'api request:{str(usage)},user type: {user_data.tier}'
         token_usage.input_tokens = inp_tk
         token_usage.output_tokens = outp_tk
         token_usage.amount = inp_tk + outp_tk
