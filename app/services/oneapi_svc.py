@@ -313,7 +313,6 @@ class OneAPISvc:
         
         key_data = ApiKeyResp.model_validate(rst)
 
-
         body = await request.json()
         messages = body.get("messages", [])
 

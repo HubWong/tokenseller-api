@@ -98,6 +98,47 @@ class TransactionRepo:
             print(f"Error in get_month_trans: {e}")
             return [], 0.0
 
+    async def get_transaction_logs_30_days(self, db: AsyncSession, typstr:str = None, *, user_id: int) -> tuple[Sequence[Transaction], float]:
+        """Get user transaction logs for the last 30 days by user_id, optionally filtered by type"""
+        try:
+            from datetime import datetime, timedelta
+            from sqlalchemy import func
+
+            # Calculate the date 30 days ago
+            thirty_days_ago = datetime.now() - timedelta(days=30)
+
+            if typstr:
+                # Filter by transaction type
+                trans_type = TransactionType(typstr)
+                stmt = (
+                    select(Transaction)
+                    .where(
+                        Transaction.maker_id == user_id,
+                        Transaction.type == trans_type,
+                )         .where(Transaction.created_at >= thirty_days_ago)
+                    .order_by(Transaction.created_at.desc())
+                )
+            else:
+                # Query all transactions for the last 30 days
+                stmt = (
+                    select(Transaction)
+                    .where(
+                        Transaction.maker_id == user_id,
+                )         .where(Transaction.created_at >= thirty_days_ago)
+                    .order_by(Transaction.created_at.desc())
+                )
+
+            result = await db.execute(stmt)
+            transactions = result.scalars().all()
+
+            # Calculate total amount (absolute values)
+            total_amount = sum(abs(t.amount) for t in transactions) if transactions else 0.0
+
+            return transactions, total_amount
+        except Exception as e:
+            print(f"Error in get_transaction_logs_30_days: {e}")
+            return [], 0.0
+        
 
     async def get_transaction_logs(self, db: AsyncSession, typstr:str = None, *, user_id: int,page:int=1,limit:int =10) -> tuple[Sequence[Transaction], float]:
         """Get user transaction logs by user_id, optionally filtered by type"""
@@ -143,7 +184,7 @@ class TransactionRepo:
     async def get_bill_datas(self, db: AsyncSession,token_cal_svc:TokenCostCalculator, user_id: int) -> Optional[Dict]:
         """Get user bill data by user_id"""
         
-        data, total_left = await self.get_transaction_logs(db=db,typstr="",user_id=user_id)
+        data, total_left = await self.get_transaction_logs_30_days(db=db,typstr="",user_id=user_id)
         _, total_recharged = await self.get_transaction_logs(db=db,typstr="recharge",user_id=user_id)
         # Get monthly consume transactions and total amount
         _, monthly_trans = await self.get_month_trans(user_id, 'consume', db)

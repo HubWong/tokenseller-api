@@ -28,3 +28,13 @@ async def get_user_apikeys(
     crud:CRUDApiKey=Depends(get_apikey_crud), db: AsyncSession = Depends(get_db)
 ):
     return await crud.get_keys(db=db, user_id=getattr(user, "id"))
+
+
+@router.delete("/delete/{key_id}")
+async def delete_apikey(
+    key_id: str,
+    user: User = Depends(get_current_user),
+    crud:CRUDApiKey=Depends(get_apikey_crud), db: AsyncSession = Depends(get_db)
+):
+    await crud.delete_key(db=db, key_id=key_id, user_id=getattr(user, "id"))
+    return {"detail": "API key deleted successfully"}

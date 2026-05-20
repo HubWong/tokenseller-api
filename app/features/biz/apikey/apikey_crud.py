@@ -71,6 +71,15 @@ class CRUDApiKey(CRUDBase[ApiKey, ApiKeyResp, ApiKeyResp]):
         
         return api_key
     
+    async def delete_key(self, db: AsyncSession, key_id: str, user_id: int) -> None:
+        stmt = select(ApiKey).where(ApiKey.key == key_id, ApiKey.user_id == user_id)
+        result = await db.execute(stmt)
+        api_key = result.scalar_one_or_none()
+        if api_key:
+            await db.delete(api_key)
+            await db.commit()
+        else:
+            raise HTTPException(status_code=404, detail="Key not found")
 
     async def get_keys(self, db: AsyncSession, user_id: int) -> ApiResp:
         try:

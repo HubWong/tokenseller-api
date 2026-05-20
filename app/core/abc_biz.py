@@ -14,6 +14,8 @@ from app.features.biz.usage.token_usage_repo import TokenUsageRepo
 from app.features.user.model.user_model import User
 from app.features.biz.apikey.apikey_schema import ApiKeyResp
 from app.services.token_money_svc import TokenCostCalculator
+from app.features.user.schemas.user_role import UserRole
+
 
 logger = logging.getLogger(__name__)
 
@@ -89,8 +91,11 @@ class ConsumeService(BaseService, ConsumeServiceABC):
         sale_price = self.calcu.tokens_to_revenue(input_tokens=inp_tk,
                                                   output_tokens=outp_tk, 
                                                   model_price=model_price,
-                                                  user_tier=user_data.tier 
+                                                  user_tier=UserRole(user_data.tier)
                                                 )
+        if sale_price < cost:
+            logger.warning(f"Calculated sale price {sale_price} is less than cost {cost} for user {user_data.id}, adjusting to cost")
+            sale_price = cost
         token_usage.status = 'completed'
         token_usage.updated_at = datetime.now()
         token_usage.memo = f'api request:{str(usage)},user type: {user_data.tier}'
@@ -99,7 +104,8 @@ class ConsumeService(BaseService, ConsumeServiceABC):
         token_usage.amount = inp_tk + outp_tk
         token_usage.provider_cost = cost
         token_usage.sale_price = sale_price # 如果有加价策略，可以在这里修改
-        token_usage.profit = Decimal(sale_price) - Decimal(cost)
+
+        token_usage.profit = sale_price - cost
 
 
         if cost > 0:
