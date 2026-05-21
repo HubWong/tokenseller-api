@@ -1,20 +1,12 @@
-from typing import Dict
-from datetime import datetime
-from typing import Optional, List, Sequence
+from typing import Optional, Sequence, Dict
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import func, select
 from app.features.biz.user_balance.models import Transaction,TransactionType
-
-import logging
 from app.core.config import settings
-
 from app.services.token_money_svc import TokenCostCalculator
+import logging
 
 logger = logging.getLogger(__name__)
-
-mastkey = settings.ONE_API_MASTERKEY
-
-REFERRAL_REWARD_LEVELS: dict[int, float] = {1: 0.10, 2: 0.05, 3: 0.02}
 
 
 # ================= 业务路由逻辑 =================
@@ -34,7 +26,7 @@ class TransactionRepo:
         maker_id: int,
         amount: float,
         transaction_type: TransactionType,
-        meta: dict = None
+        meta: Optional[Dict[str, str]] = None
     ):
         try:
             order_id = meta.get("id", None) if meta else None
@@ -57,15 +49,8 @@ class TransactionRepo:
         except Exception as e:
             await session.rollback()
             logger.error(f"Error adding transaction: {str(e)}")
-            raise           
-   
-            
-    async def get_by_user(self, db: AsyncSession, *, user_id: int) -> Optional[Transaction]:
-        """Get user balance by user_id"""
-        result = await db.execute(
-            select(Transaction).where(Transaction.maker_id == user_id)
-        )
-        return result.scalars().first()
+            return None           
+               
     
     async def get_month_trans(self,user_id:int,type_str:str, db: AsyncSession)->tuple[Sequence[Transaction], float]:
         from datetime import datetime
@@ -80,7 +65,7 @@ class TransactionRepo:
                 select(Transaction)
                 .where(
                     Transaction.maker_id == user_id,
-                    Transaction.type == trans_type,
+                    Transaction.type == trans_type.value,
                     func.extract('year', Transaction.created_at) == datetime.now().year,
                     func.extract('month', Transaction.created_at) == datetime.now().month
                 )
@@ -98,14 +83,18 @@ class TransactionRepo:
             print(f"Error in get_month_trans: {e}")
             return [], 0.0
 
-    async def get_transaction_logs_30_days(self, db: AsyncSession, typstr:str = None, *, user_id: int) -> tuple[Sequence[Transaction], float]:
+
+    async def get_recent_logs(self, db: AsyncSession,
+                                           user_id: int, 
+                                           days: int = 30,
+                                           typstr:Optional[str] = None
+                                           ) -> Sequence[Transaction]:
         """Get user transaction logs for the last 30 days by user_id, optionally filtered by type"""
         try:
             from datetime import datetime, timedelta
-            from sqlalchemy import func
 
             # Calculate the date 30 days ago
-            thirty_days_ago = datetime.now() - timedelta(days=30)
+            thirty_days_ago = datetime.now() - timedelta(days=days)
 
             if typstr:
                 # Filter by transaction type
@@ -114,8 +103,8 @@ class TransactionRepo:
                     select(Transaction)
                     .where(
                         Transaction.maker_id == user_id,
-                        Transaction.type == trans_type,
-                )         .where(Transaction.created_at >= thirty_days_ago)
+                        Transaction.type == trans_type.value,
+                        Transaction.created_at >= thirty_days_ago)
                     .order_by(Transaction.created_at.desc())
                 )
             else:
@@ -124,75 +113,93 @@ class TransactionRepo:
                     select(Transaction)
                     .where(
                         Transaction.maker_id == user_id,
-                )         .where(Transaction.created_at >= thirty_days_ago)
+                        Transaction.created_at >= thirty_days_ago)
                     .order_by(Transaction.created_at.desc())
                 )
 
             result = await db.execute(stmt)
-            transactions = result.scalars().all()
-
-            # Calculate total amount (absolute values)
-            total_amount = sum(abs(t.amount) for t in transactions) if transactions else 0.0
-
-            return transactions, total_amount
+            transactions = result.scalars().all()           
+           
+            return transactions
         except Exception as e:
-            print(f"Error in get_transaction_logs_30_days: {e}")
-            return [], 0.0
-        
+            print(f"Error in get_recent_logs: {e}")
+            return []        
 
-    async def get_transaction_logs(self, db: AsyncSession, typstr:str = None, *, user_id: int,page:int=1,limit:int =10) -> tuple[Sequence[Transaction], float]:
-        """Get user transaction logs by user_id, optionally filtered by type"""
+    
+    async def get_paged_logs(
+        self,
+        db: AsyncSession,
+        user_id: int,
+        typstr: Optional[str] = None,
+        page: int = 1,
+        limit: int = 10
+    ) -> tuple[Sequence[Transaction], int, float]:
+        """        
+        返回：(当前页交易列表, 总条数, 总金额)
+        """
         try:
+            # 1. 构建基础查询条件（合并 where，更简洁）
+            query_conditions = [Transaction.maker_id == user_id]
+            
             if typstr:
-                # Filter by transaction type
                 trans_type = TransactionType(typstr)
-                stmt = (
-                    select(Transaction)
-                    .where(
-                        Transaction.maker_id == user_id,
-                        Transaction.type == trans_type
-                    )
-                    .order_by(Transaction.created_at.desc())
-                )
-            else:
-                # Query all transactions
-                stmt = (
-                    select(Transaction)
-                    .where(Transaction.maker_id == user_id)
-                    .order_by(Transaction.created_at.desc())
-                )
+                query_conditions.append(Transaction.type == trans_type.value)
 
+            # 2. 分页偏移量计算
+            offset = (page - 1) * limit
+
+            # 3. 查询当前页数据（只查这一页，性能极高）
+            stmt = (
+                select(Transaction)
+                .where(*query_conditions)
+                .order_by(Transaction.created_at.desc())
+                .limit(limit)
+                .offset(offset)
+            )
             result = await db.execute(stmt)
             transactions = result.scalars().all()
 
-            # Calculate total amount (absolute values)
-            total_amount = sum(abs(t.amount) for t in transactions) if transactions else 0.0
+            # 4. 查询符合条件的【总条数】（用于前端分页）
+            count_stmt = select(func.count()).where(*query_conditions)
+            total_count = await db.scalar(count_stmt) or 0
 
-            return transactions, total_amount
+            # 5. 查询【数据库级总金额】（不是内存求和，性能提升巨大）
+            amount_stmt = (
+                select(func.sum(func.abs(Transaction.amount)))
+                .where(*query_conditions)
+            )
+            total_amount = await db.scalar(amount_stmt) or 0.0
+
+            return transactions, total_count, total_amount
+
         except Exception as e:
-            print(f"Error in get_transaction_logs: {e}")
-            return [], 0.0
+            print(f"Error in get_paged_logs: {e}")
+            return [], 0, 0.0   
         
 
-    async def get_tokens_by_money(self,token_cal_svc:TokenCostCalculator,model_str:str='default',money_list:list=settings.BILL_PRICE_SET)->dict:
+    async def get_tokens_by_money(self,token_cal_svc:TokenCostCalculator,
+                                  model_str:str='default',
+                                  money_list:list=settings.BILL_PRICE_SET)->dict:
         if not money_list:
             money_list = [25 * (2 ** n) for n in range(10) if 25 * (2 ** n) < 500]
         
         #result = {x:await token_cal_svc.money_to_tokens(amount=x,model=model_str) for x in money_list}
         return money_list
 
-    async def get_bill_datas(self, db: AsyncSession,token_cal_svc:TokenCostCalculator, user_id: int) -> Optional[Dict]:
+    #????????
+    async def get_bill_datas(self, db: AsyncSession, *, user_id: int) -> Optional[Dict]:
         """Get user bill data by user_id"""
         
-        data, total_left = await self.get_transaction_logs_30_days(db=db,typstr="",user_id=user_id)
-        _, total_recharged = await self.get_transaction_logs(db=db,typstr="recharge",user_id=user_id)
+        data = await self.get_recent_logs(db=db,typstr="",days=30,user_id=user_id)
+        records,_, balance = await self.get_paged_logs(db=db,user_id=user_id)
         # Get monthly consume transactions and total amount
         _, monthly_trans = await self.get_month_trans(user_id, 'consume', db)
         money_tokens = settings.BILL_PRICE_SET
+        total_recharged = sum(t.amount for t in records if t.type == TransactionType.RECHARGE.value)
         return {  
-            'balance':total_left,
+            'balance':balance,
             'monthly_trans':monthly_trans,
-            'trans_logs':data, 
+            'trans_logs':data, #最近30天的交易记录
             'total_recharge':total_recharged,
             'money_tokens':money_tokens
         }

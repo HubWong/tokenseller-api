@@ -5,7 +5,7 @@ from app.core.config import settings
 
 async def get_redis():   
     return await redis.from_url(
-    'redis://default:HYWOrzxxIaMSwuymHbICKQbTnmovFTFF@shinkansen.proxy.rlwy.net:31115',
+    settings.REDIS_URL,
     max_connections=settings.REDIS_POOL_SIZE,   
     db=0,
     decode_responses=True,  # 自动转字符串

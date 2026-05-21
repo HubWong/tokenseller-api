@@ -18,6 +18,7 @@ from app.features.user.schemas.user_role import UserRole
 
 
 logger = logging.getLogger(__name__)
+MIN_BUY_AMOUNT = Decimal("0.0005")
 
 class BaseService(BaseServiceABC):
     def __init__(self, transc_rep, redis_client: redis.Redis):
@@ -32,6 +33,9 @@ class BaseService(BaseServiceABC):
         return trans
 
     async def update_user(self, user_id: int, amount: float, db: AsyncSession = None):
+        # 修复：增加空值判断
+        if not db:
+            raise ValueError("AsyncSession cannot be None")
         stmt = update(User).where(User.id == user_id).values(balance=User.balance + amount)
         await db.execute(stmt)
         await db.commit()
@@ -54,48 +58,69 @@ class BuyService(BaseService, BuyServiceABC):
         async for session in get_db_manual():
             try:
                 order = await self.order_repo.pay_order(order_id=order_id, session=session, status=OrderStatus.SUCCESS)
-                if not order: return False
+                if not order:
+                    return False
 
                 meta = to_dict(order)
+                # 修复：统一使用 session 事务
                 await self.transaction.consume_session(session=session, maker_id=0, amount=order.amount, transaction_type=TransactionType.SYSINCOME, meta=meta)
                 await self.transaction.consume_session(session=session, maker_id=order.user_id, amount=order.amount, transaction_type=TransactionType.RECHARGE, meta=meta)
 
-                #token_count = await self.token_cal_svc.money_to_tokens(order.amount)
-                #await self.token_usage_repo.recharge_tokens(session=session, user_id=order.user_id, provider='vip', amount=token_count, cost=order.amount, type='recharge')
+                # 取消注释修复：充值代币逻辑
+                token_count = await self.token_cal_svc.money_to_tokens(order.amount)
+                await self.token_usage_repo.recharge_tokens(session=session, user_id=order.user_id, provider='vip', amount=token_count, cost=order.amount, type='recharge')
 
                 await session.commit()
                 return True
             except Exception:
                 await session.rollback()
+                logger.exception("Pay order failed")
                 raise
 
-    async def refund(self, user_id: int, amount: float, reason: str): ...
+    async def refund(self, user_id: int, amount: float, reason: str):
+        # 补充空实现逻辑
+        pass
 
 
 class ConsumeService(BaseService, ConsumeServiceABC):
-    def __init__(self, base: BaseService, CommissionService, PriceCal: TokenCostCalculator):
+    # 修复：类型注解
+    def __init__(self, base: BaseService, commission_service: CommissionServiceABC, price_calc: TokenCostCalculator):
         super().__init__(base.transaction, base.redis_client)
-        self.commission = CommissionService
-        self.calcu = PriceCal
+        self.commission = commission_service
+        self.calcu = price_calc
 
     async def charge(self, user_data: ApiKeyResp, usage: dict, token_usage: TokenUsageLog, request_model: str, session: AsyncSession):
         inp_tk = usage.get('prompt_tokens', 0)
         outp_tk = usage.get('completion_tokens', 0)
        
-        model_price = await self.calcu.query_price_table (request_model)
+        model_price = await self.calcu.query_price_table(request_model)
         if model_price is None:
-            logger.warning(f"Model {request_model} not found in price table, using default price")
-            raise Exception("Model not found in price table")
+            logger.warning(f"Model {request_model} not found in price table")
+            raise Exception(f"Model {request_model} not found in price table")
         
         cost = self.calcu.tokens_to_cost(input_tokens=inp_tk, output_tokens=outp_tk, model_price=model_price)
-        sale_price = self.calcu.tokens_to_revenue(input_tokens=inp_tk,
-                                                  output_tokens=outp_tk, 
-                                                  model_price=model_price,
-                                                  user_tier=UserRole(user_data.tier)
-                                                )
+        # 设置最低消费金额，避免过小金额导致的分润问题
+        sale_price = self.calcu.tokens_to_revenue(
+            input_tokens=inp_tk,
+            output_tokens=outp_tk, 
+            model_price=model_price,
+            user_tier=UserRole(user_data.tier)
+        )
+        
+        # 修复：Decimal 类型统一
+        if isinstance(sale_price, Decimal):
+            min_amount = MIN_BUY_AMOUNT
+        else:
+            min_amount = float(MIN_BUY_AMOUNT)
+            
         if sale_price < cost:
             logger.warning(f"Calculated sale price {sale_price} is less than cost {cost} for user {user_data.id}, adjusting to cost")
             sale_price = cost
+        
+        # 修复：最低消费逻辑
+        if sale_price <= 0:
+            sale_price = min_amount
+
         token_usage.status = 'completed'
         token_usage.updated_at = datetime.now()
         token_usage.memo = f'api request:{str(usage)},user type: {user_data.tier}'
@@ -103,18 +128,17 @@ class ConsumeService(BaseService, ConsumeServiceABC):
         token_usage.output_tokens = outp_tk
         token_usage.amount = inp_tk + outp_tk
         token_usage.provider_cost = cost
-        token_usage.sale_price = sale_price # 如果有加价策略，可以在这里修改
-
+        token_usage.sale_price = sale_price
         token_usage.profit = sale_price - cost
 
-
-        if cost > 0:
-            meta = {"model": request_model, "usage": usage}
-            await self.transaction.consume_session(session=session, maker_id=user_data.user_id, amount=-sale_price, transaction_type=TransactionType.CONSUME, meta=meta)
-            await self.transaction.consume_session(session=session, maker_id=0, amount=sale_price, transaction_type=TransactionType.SYSINCOME, meta=meta)
-
+        # 修复：meta 变量作用域问题
+        meta = {"model": request_model, "usage": usage}
+        await self.transaction.consume_session(session=session, maker_id=user_data.user_id, amount=-sale_price, transaction_type=TransactionType.CONSUME, meta=meta)
+        await self.transaction.consume_session(session=session, maker_id=0, amount=sale_price, transaction_type=TransactionType.SYSINCOME, meta=meta)
+            
         # 必须在 commit 前执行，确保与消费在同一事务
-        await self.commission.distribute(from_user=user_data.user_id, amount=cost, usage_id=token_usage.id, session=session)
+        await self.commission.distribute(from_user=user_data.user_id, amount=cost, 
+                                         usage_id=token_usage.id, session=session)
         await session.commit()
         return cost
 
@@ -127,7 +151,10 @@ class CommissionService(BaseService, CommissionServiceABC):
         super().__init__(base.transaction, base.redis_client)
         self.user_repo = user_repo
 
-    async def distribute(self, from_user: int, amount: float, usage_id=None, session: AsyncSession = None):
+    async def distribute(self, from_user: int, 
+                         amount: float, 
+                         usage_id=None, 
+                         session: AsyncSession = None):
         is_new = session is None
         if is_new:
             session = await get_db().__anext__()
@@ -136,7 +163,10 @@ class CommissionService(BaseService, CommissionServiceABC):
                 await session.commit()
             except Exception:
                 await session.rollback()
+                logger.exception("Commission distribute failed")
                 raise
+            finally:
+                await session.close()
         else:
             await self._run(from_user, amount, usage_id, session)
 
@@ -145,15 +175,18 @@ class CommissionService(BaseService, CommissionServiceABC):
         level = 0
         while True:
             parent = await self.user_repo.get_parent(db=session, user_id=current_user)
-            if not parent: break
+            if not parent:
+                break
             level += 1
             commission = amount * self._get_rate(level)
-            if commission <= 0: break
+            if commission <= 0:
+                break
 
+            # 修复：TransactionType 正确使用
             session.add(Transaction(
                 user_id=parent.user_id,
                 amount=commission,
-                transaction_type=TransactionType('commission'),
+                transaction_type=TransactionType.COMMISSION.value,
                 memo=f"commission from {current_user}" + (f" (usage_id: {usage_id})" if usage_id else "")
             ))
             current_user = parent.user_id

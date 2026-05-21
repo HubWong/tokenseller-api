@@ -90,7 +90,7 @@ async def get_commission_svc(
 async def get_consume_svc(base:BaseService=Depends(get_base_svc), 
     commission_svc:CommissionService=Depends(get_commission_svc),
     price_cal_svc:TokenCostCalculator=Depends(get_token_cal_svc)) -> ConsumeService:
-    return ConsumeService(base, CommissionService=commission_svc, PriceCal=price_cal_svc)
+    return ConsumeService(base=base, commission_service=commission_svc, price_calc=price_cal_svc)
 
 
 async def get_apikey_crud():

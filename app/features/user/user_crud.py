@@ -201,56 +201,57 @@ class CRUDUser(CRUDBase[User, UserCreate, UserCvUpdate]):
 
 
     async def user_list(
-        self, db: AsyncSession, *, size: int = 10, forAdmin: bool = False,
-        page: int = 1,       
+        self,
+        db: AsyncSession,
+        *,
+        size: int = 10,
+        for_admin: bool = False,  # 规范命名：蛇形命名 for_admin (Python 标准)
+        page: int = 1,
         sort_by: str = "id",        # 支持排序字段：id, name, created_at
         sort_order: str = "asc",    # asc / desc
-    ) -> Tuple[Sequence[UserForAdmin], int]:
-        
+        ) -> Tuple[Sequence[UserForAdmin], int]:
         """
         返回：(用户列表, 总记录数)
         """
-        if page < 1:
-            page = 1
-        if size < 1:
-            size = 10
-        if size > 100:
-            size = 100  # 防止滥用
+        # 1. 参数合法性校验与默认值处理
+        page = max(page, 1)
+        size = max(min(size, 100), 1)  # 一行搞定：1 ≤ size ≤ 100
 
-        # ✅ 构造主查询（带左连接 avatar）
-        # 注意：把 avatar 条件写进 JOIN ON，而非 WHERE，否则会过滤掉无 avatar 用户！
-        stmt = (
-            select(User, Photo)
-            .join(
-                Photo,
-                (User.id == Photo.user_id) & (Photo.description == 'avatar'),
-                isouter=True  # ← 关键！左连接
-            )
-        )
+        # 合法排序字段/方向
+        valid_sort_fields = ["id", "name", "created_at"]
+        valid_sort_orders = ["asc", "desc"]
+        sort_by = sort_by if sort_by in valid_sort_fields else "id"
+        sort_order = sort_order if sort_order in valid_sort_orders else "asc"
 
-        # 🔁 排序
-        sort_col = getattr(User, sort_by, User.id)
-        if sort_order.lower() == "desc":
-            stmt = stmt.order_by(sort_col.desc())
-        else:
-            stmt = stmt.order_by(sort_col.asc())
+        # 2. 构建基础查询
+        query = select(User).where(User.is_active.is_(True))  # 更规范的布尔判断
 
-        # 🧮 分页：先查总数（独立 COUNT 查询，精确）
-        count_stmt = select(func.count()).select_from(User)
-        total_result = await db.execute(count_stmt)
-        total = total_result.scalar_one()
+        # 非管理员仅查询普通用户
+        if not for_admin:
+            query = query.where(User.role == UserRole.USER)
 
-        # 📄 分页数据：LIMIT + OFFSET
-        stmt = stmt.offset((page - 1) * size).limit(size)
+        # 3. 查询总条数（优化：无需子查询，直接 count 原表，性能更好）
+        count_query = select(func.count()).select_from(User).where(*query.whereclause)  # 直接复用 where 条件，无需子查询
+        total_result = await db.execute(count_query)
+        total = total_result.scalar_one_or_none() or 0
 
-        # 🔍 执行查询
-        result = await db.execute(stmt)
-        rows = result.all()  # List[Tuple[User, Photo | None]]
-        data =[]
-        # 🧹 转为响应结构
-        for u in rows:
-            user_with_avatar = UserForAdmin.model_validate(u)            
-            data.append(user_with_avatar)
+        if total == 0:
+            return [], 0
+
+        # 4. 动态排序（安全、无异常、类型安全）
+        sort_column = getattr(User, sort_by)
+        sort_expression = sort_column.asc() if sort_order == "asc" else sort_column.desc()
+
+        # 5. 分页查询
+        skip = (page - 1) * size
+        paginated_query = query.order_by(sort_expression).offset(skip).limit(size)
+
+        result = await db.execute(paginated_query)
+        db_objs = result.scalars().all()
+
+        # 6. 转换为 Pydantic 模型（列表推导式更简洁）
+        data = [UserForAdmin.model_validate(obj) for obj in db_objs]
+
         return data, total
 
     async def search_users(

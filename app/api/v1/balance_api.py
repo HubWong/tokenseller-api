@@ -52,4 +52,4 @@ async def get_bill_data( db:AsyncSession=Depends(get_db),
                         cur_user:User=Depends(get_current_user)):
     """Get user bill data."""
     user_id = cur_user.id
-    return await trans_rep.get_bill_datas(db=db,user_id=user_id,token_cal_svc=token_cal_svc)
+    return await trans_rep.get_bill_datas(db=db,user_id=user_id)
