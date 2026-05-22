@@ -9,6 +9,7 @@ from app.services.oneapi_svc import OneAPISvc
 from app.services.listener_svc import order_pool
 from app.core.config import settings
 from app.core.database import Base, async_engine, sync_columns
+from sqlalchemy import text
 from listener import main as run_listener
 import logging
 
@@ -64,6 +65,26 @@ async def init_db():
         await conn.run_sync(Base.metadata.create_all)
 
 
+async def seed_pricing_data():
+    """插入默认模型定价数据（如已存在则跳过）"""
+    sql = text("""
+        INSERT INTO model_pricing
+        (model_name, input_cost, output_cost, input_price, output_price, currency, is_active, level, created_at)
+        VALUES
+        ('DeepSeek-V4 Flash', 0.0028, 0.28, 0.00448, 0.448, 'USD', 1, 3, NOW()),
+        ('Qwen3.6 Flash (通义)', 0.0056, 0.028, 0.00896, 0.0448, 'USD', 1, 3, NOW()),
+        ('文心4.0 Turbo', 0.021, 0.084, 0.0336, 0.1344, 'USD', 1, 3, NOW()),
+        ('GLM-4 Air (智谱)', 0.042, 0.14, 0.0672, 0.224, 'USD', 1, 3, NOW()),
+        ('讯飞星火4.0', 0.07, 0.28, 0.112, 0.448, 'USD', 1, 3, NOW()),
+        ('Qwen3.6 Plus (通义)', 0.28, 1.68, 0.448, 2.688, 'USD', 1, 3, NOW()),
+        ('DeepSeek-V4 Pro', 0.42, 0.84, 0.672, 1.344, 'USD', 1, 3, NOW())
+        ON CONFLICT (model_name) DO NOTHING
+    """)
+    async with async_engine.begin() as conn:
+        await conn.execute(sql)
+    logger.info("Seed pricing data checked.")
+
+
 def login_info(message: str):
     logger.info('environment: %s | %s', settings.APP_ENV, message)
     logger.info('database: %s', settings.SQL_DB_URL.split("://")[0] if settings.SQL_DB_URL else "unknown")
@@ -84,6 +105,7 @@ async def lifespanJob(app: FastAPI):
     login_info("Starting up application...")
     await init_db()
     await sync_columns()
+    await seed_pricing_data()
     create_upload_dir()
     app.state.oneapi_svc = OneAPISvc()
 
