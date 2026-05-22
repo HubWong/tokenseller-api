@@ -3,6 +3,7 @@ from app.back_jobs.jobs import job_clean_expired_files, job_gen_reports
 from contextlib import asynccontextmanager, suppress
 from fastapi import FastAPI
 import asyncio
+import os
 from app.services.file_svc import create_upload_dir
 from concurrent.futures import ThreadPoolExecutor
 from app.services.oneapi_svc import OneAPISvc
@@ -10,6 +11,8 @@ from app.services.listener_svc import order_pool
 from app.core.config import settings
 from listener import main as run_listener
 import logging
+from alembic.config import Config
+from alembic import command
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -57,6 +60,13 @@ def stop_scheduler():
         print("Scheduler stopped.")
         
  
+def run_migrations():
+    """运行 Alembic 数据库迁移"""
+    alembic_cfg_path = os.path.join(settings.PROJECT_ROOT, "alembic.ini")
+    alembic_cfg = Config(alembic_cfg_path)
+    command.upgrade(alembic_cfg, "head")
+
+
 def login_info(message: str):
     logger.info('environment: %s | %s', settings.APP_ENV, message)
     logger.info('database: %s', settings.SQL_DB_URL.split("://")[0] if settings.SQL_DB_URL else "unknown")
@@ -75,6 +85,8 @@ Request scoped:
 @asynccontextmanager
 async def lifespanJob(app: FastAPI):
     login_info("Starting up application...")
+    loop = asyncio.get_running_loop()
+    await loop.run_in_executor(executor, run_migrations)
     create_upload_dir()
     app.state.oneapi_svc = OneAPISvc()
 
@@ -91,8 +103,6 @@ async def lifespanJob(app: FastAPI):
             logger.exception("Tron listener task crashed")
 
     app.state.tron_listener_task = asyncio.create_task(_listener_background())
-
-    loop = asyncio.get_running_loop()
 
     await loop.run_in_executor(executor, start_scheduler)
     try:
