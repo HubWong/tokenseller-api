@@ -18,12 +18,16 @@ class PriceRepo:
         model_name: str,
         input_cost: float,
         output_cost: float,
-        input_price: float,
-        output_price: float,
+        input_price: Optional[float] = None,
+        output_price: Optional[float] = None,
         currency: str = "USD",
         is_active: bool = True
     ) -> ModelPricing:
         """Create a new model pricing record"""
+        if input_price is None:
+            input_price = round(input_cost * 1.5, 6)
+        if output_price is None:
+            output_price = round(output_cost * 1.5, 6)
         pricing = ModelPricing(
             model_name=model_name,
             input_cost=input_cost,
@@ -113,8 +117,12 @@ class PriceRepo:
             update_data['output_cost'] = output_cost
         if input_price is not None:
             update_data['input_price'] = input_price
+        elif input_cost is not None:
+            update_data['input_price'] = round(input_cost * 1.5, 6)
         if output_price is not None:
             update_data['output_price'] = output_price
+        elif output_cost is not None:
+            update_data['output_price'] = round(output_cost * 1.5, 6)
         if currency is not None:
             update_data['currency'] = currency
         if is_active is not None:
