@@ -9,9 +9,9 @@ from datetime import datetime
 class UsageStatsResponse(BaseModel):
     """Usage statistics response"""
     date: str
-    tokens_used: Optional[float|str]
-    cost_usd: Optional[float|str]
-    api_calls: int
+    tokens_used: float = 0.0
+    cost_usd: float = 0.0
+    api_calls: int = 0
 
 
 class RecentRequestResponse(BaseModel):
