@@ -66,7 +66,7 @@ async def init_db():
 
 
 async def seed_pricing_data():
-    """插入默认模型定价数据（如已存在则跳过）"""
+    """插入默认模型定价数据（如已存在则更新）"""
     sql = text("""
         INSERT INTO model_pricing
         (model_name, input_cost, output_cost, input_price, output_price, currency, is_active, level, created_at)
@@ -78,7 +78,14 @@ async def seed_pricing_data():
         ('讯飞星火4.0', 0.07, 0.28, 0.112, 0.448, 'USD', 1, 3, NOW()),
         ('Qwen3.6 Plus (通义)', 0.28, 1.68, 0.448, 2.688, 'USD', 1, 3, NOW()),
         ('DeepSeek-V4 Pro', 0.42, 0.84, 0.672, 1.344, 'USD', 1, 3, NOW())
-        ON CONFLICT (model_name) DO NOTHING
+        ON CONFLICT (model_name) DO UPDATE SET
+            input_cost = EXCLUDED.input_cost,
+            output_cost = EXCLUDED.output_cost,
+            input_price = EXCLUDED.input_price,
+            output_price = EXCLUDED.output_price,
+            currency = EXCLUDED.currency,
+            is_active = EXCLUDED.is_active,
+            level = EXCLUDED.level
     """)
     async with async_engine.begin() as conn:
         await conn.execute(sql)
