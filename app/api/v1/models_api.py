@@ -76,6 +76,8 @@ async def update_model(
             return ApiResp(success=False, message=f"Model {model_name} not defined") 
         model = await price_repo.update_pricing(
             model_name=model_name,
+            input_cost=model_data.input_cost,
+            output_cost=model_data.output_cost,
             input_price=model_data.input_price,
             output_price=model_data.output_price,
             currency=model_data.currency,

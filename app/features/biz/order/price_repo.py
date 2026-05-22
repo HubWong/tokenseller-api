@@ -94,6 +94,8 @@ class PriceRepo:
     async def update_pricing(
         self,
         model_name: str,
+        input_cost: Optional[float] = None,
+        output_cost: Optional[float] = None,
         input_price: Optional[float] = None,
         output_price: Optional[float] = None,
         currency: Optional[str] = None,
@@ -105,6 +107,10 @@ class PriceRepo:
             return None
 
         update_data = {}
+        if input_cost is not None:
+            update_data['input_cost'] = input_cost
+        if output_cost is not None:
+            update_data['output_cost'] = output_cost
         if input_price is not None:
             update_data['input_price'] = input_price
         if output_price is not None:
