@@ -3,16 +3,14 @@ from app.back_jobs.jobs import job_clean_expired_files, job_gen_reports
 from contextlib import asynccontextmanager, suppress
 from fastapi import FastAPI
 import asyncio
-import os
 from app.services.file_svc import create_upload_dir
 from concurrent.futures import ThreadPoolExecutor
 from app.services.oneapi_svc import OneAPISvc
 from app.services.listener_svc import order_pool
 from app.core.config import settings
+from app.core.database import Base, async_engine, sync_columns
 from listener import main as run_listener
 import logging
-from alembic.config import Config
-from alembic import command
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -60,14 +58,10 @@ def stop_scheduler():
         print("Scheduler stopped.")
         
  
-def run_migrations():
-    """运行 Alembic 数据库迁移，纯代码配置不依赖 alembic.ini"""
-    # schedule.py 在 app/back_jobs/ 下，migrations/ 在项目根目录
-    _project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    alembic_cfg = Config()
-    alembic_cfg.set_main_option("script_location", os.path.join(_project_root, "migrations"))
-    alembic_cfg.set_main_option("sqlalchemy.url", settings.SQL_DB_URL_Sync)
-    command.upgrade(alembic_cfg, "head")
+async def init_db():
+    """根据模型定义自动创建不存在的表"""
+    async with async_engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
 
 
 def login_info(message: str):
@@ -88,8 +82,8 @@ Request scoped:
 @asynccontextmanager
 async def lifespanJob(app: FastAPI):
     login_info("Starting up application...")
-    loop = asyncio.get_running_loop()
-    await loop.run_in_executor(executor, run_migrations)
+    await init_db()
+    await sync_columns()
     create_upload_dir()
     app.state.oneapi_svc = OneAPISvc()
 
@@ -107,6 +101,7 @@ async def lifespanJob(app: FastAPI):
 
     app.state.tron_listener_task = asyncio.create_task(_listener_background())
 
+    loop = asyncio.get_running_loop()
     await loop.run_in_executor(executor, start_scheduler)
     try:
         yield
