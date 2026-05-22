@@ -81,6 +81,8 @@ class PriceRepo:
             result.append({
                 "name": item.model_name,
                 'id':item.id,
+                'input_cost':float(item.input_cost),
+                'output_cost':float(item.output_cost),
                 "input_price": float(item.input_price),
                 "output_price": float(item.output_price),
                 "currency": item.currency,

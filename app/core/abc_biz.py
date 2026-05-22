@@ -1,7 +1,9 @@
 import logging
 from datetime import datetime
 from sqlalchemy import select, update
+from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.exc import SQLAlchemyError 
 import redis.asyncio as redis
 from decimal import Decimal
 from app.core.abc import BuyServiceABC, CommissionServiceABC, ConsumeServiceABC, BaseServiceABC
@@ -65,10 +67,7 @@ class BuyService(BaseService, BuyServiceABC):
                 # 修复：统一使用 session 事务
                 await self.transaction.consume_session(session=session, maker_id=0, amount=order.amount, transaction_type=TransactionType.SYSINCOME, meta=meta)
                 await self.transaction.consume_session(session=session, maker_id=order.user_id, amount=order.amount, transaction_type=TransactionType.RECHARGE, meta=meta)
-
-                # 取消注释修复：充值代币逻辑
-                token_count = await self.token_cal_svc.money_to_tokens(order.amount)
-                await self.token_usage_repo.recharge_tokens(session=session, user_id=order.user_id, provider='vip', amount=token_count, cost=order.amount, type='recharge')
+                 
 
                 await session.commit()
                 return True
@@ -90,56 +89,97 @@ class ConsumeService(BaseService, ConsumeServiceABC):
         self.calcu = price_calc
 
     async def charge(self, user_data: ApiKeyResp, usage: dict, token_usage: TokenUsageLog, request_model: str, session: AsyncSession):
+        # 1. 获取 token 数量
         inp_tk = usage.get('prompt_tokens', 0)
         outp_tk = usage.get('completion_tokens', 0)
-       
+
+        # 2. 查询模型价格（不存在直接抛错）
         model_price = await self.calcu.query_price_table(request_model)
         if model_price is None:
             logger.warning(f"Model {request_model} not found in price table")
             raise Exception(f"Model {request_model} not found in price table")
-        
+
+        # 3. 计算成本与售价
         cost = self.calcu.tokens_to_cost(input_tokens=inp_tk, output_tokens=outp_tk, model_price=model_price)
-        # 设置最低消费金额，避免过小金额导致的分润问题
         sale_price = self.calcu.tokens_to_revenue(
             input_tokens=inp_tk,
-            output_tokens=outp_tk, 
+            output_tokens=outp_tk,
             model_price=model_price,
             user_tier=UserRole(user_data.tier)
         )
-        
-        # 修复：Decimal 类型统一
-        if isinstance(sale_price, Decimal):
-            min_amount = MIN_BUY_AMOUNT
-        else:
-            min_amount = float(MIN_BUY_AMOUNT)
-            
-        if sale_price < cost:
-            logger.warning(f"Calculated sale price {sale_price} is less than cost {cost} for user {user_data.id}, adjusting to cost")
-            sale_price = cost
-        
-        # 修复：最低消费逻辑
-        if sale_price <= 0:
-            sale_price = min_amount
 
+        # ===================== 修复 1：统一 Decimal 类型 =====================
+        # 强制全部使用 Decimal，避免 float 精度丢失 + 类型比较错误
+        MIN_BUY_AMOUNT_DEC = Decimal(MIN_BUY_AMOUNT) if not isinstance(MIN_BUY_AMOUNT, Decimal) else MIN_BUY_AMOUNT
+        cost = Decimal(cost) if not isinstance(cost, Decimal) else cost
+        sale_price = Decimal(sale_price) if not isinstance(sale_price, Decimal) else sale_price
+
+        # ===================== 修复 2：售价不能低于成本 =====================
+        if sale_price < cost:
+            logger.warning(f"Sale price {sale_price} < cost {cost} for user {user_data.id}, force set to cost")
+            sale_price = cost
+
+        # ===================== 修复 3：最低消费金额 =====================
+        if sale_price < MIN_BUY_AMOUNT_DEC:
+            sale_price = MIN_BUY_AMOUNT_DEC
+
+        # ===================== 修复 4：更新 token 日志 =====================
         token_usage.status = 'completed'
         token_usage.updated_at = datetime.now()
-        token_usage.memo = f'api request:{str(usage)},user type: {user_data.tier}'
+        token_usage.memo = f'api request:{str(usage)}, user type: {user_data.tier}'
         token_usage.input_tokens = inp_tk
         token_usage.output_tokens = outp_tk
         token_usage.amount = inp_tk + outp_tk
         token_usage.provider_cost = cost
         token_usage.sale_price = sale_price
-        token_usage.profit = sale_price - cost
+        token_usage.profit = sale_price - cost  # 利润自动正确
 
-        # 修复：meta 变量作用域问题
+        # 元数据
         meta = {"model": request_model, "usage": usage}
-        await self.transaction.consume_session(session=session, maker_id=user_data.user_id, amount=-sale_price, transaction_type=TransactionType.CONSUME, meta=meta)
-        await self.transaction.consume_session(session=session, maker_id=0, amount=sale_price, transaction_type=TransactionType.SYSINCOME, meta=meta)
-            
-        # 必须在 commit 前执行，确保与消费在同一事务
-        await self.commission.distribute(from_user=user_data.user_id, amount=cost, 
-                                         usage_id=token_usage.id, session=session)
-        await session.commit()
+
+        # ===================== 修复 5：事务安全 + 异常处理 =====================
+        try:
+            # 用户扣费
+            await self.transaction.consume_session(
+                session=session,
+                maker_id=user_data.user_id,
+                amount=-sale_price,
+                transaction_type=TransactionType.CONSUME,
+                meta=meta
+            )
+            # 平台收入
+            await self.transaction.consume_session(
+                session=session,
+                maker_id=0,
+                amount=sale_price,
+                transaction_type=TransactionType.SYSINCOME,
+                meta=meta
+            )
+
+            # 分润逻辑：必须满足 售价>最低金额 且 有利润
+            profit = sale_price - cost
+            if sale_price > MIN_BUY_AMOUNT_DEC and profit > 0:
+                # 必须在同一事务内
+                await self.commission.distribute(
+                    from_user=user_data.user_id,
+                    amount=profit,
+                    usage_id=token_usage.id,
+                    session=session
+                )
+
+            # 统一提交
+            await session.commit()
+            logger.info(f"Charge success for user {user_data.id}, cost={cost}, sale_price={sale_price}, profit={profit}")
+
+        except SQLAlchemyError as e:
+            await session.rollback()
+            logger.error(f"Charge transaction failed, rollback: {str(e)}", exc_info=True)
+            raise
+        except Exception as e:
+            await session.rollback()
+            logger.error(f"Charge failed, rollback: {str(e)}", exc_info=True)
+            raise
+
         return cost
 
     async def refund(self, db: AsyncSession, user_id: int, amount: float, reason: str):
@@ -154,7 +194,7 @@ class CommissionService(BaseService, CommissionServiceABC):
     async def distribute(self, from_user: int, 
                          amount: float, 
                          usage_id=None, 
-                         session: AsyncSession = None):
+                         session: Optional[AsyncSession] = None):
         is_new = session is None
         if is_new:
             session = await get_db().__anext__()

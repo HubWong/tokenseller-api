@@ -18,7 +18,7 @@ class User(Base, TimestampMixin):
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String(255), unique=True, index=True, nullable=False)
     username = Column(String(50), default="",nullable=True)
-    hashed_password = Column(String(255), nullable=False)       
+    hashed_password = Column(String(255), nullable=True)       
     role = Column(Enum(UserRole), default=UserRole.USER)
     is_active = Column(Boolean, default=True)    
     reset_pwd_token = Column(String(200), nullable=True)  # reset password token
@@ -29,6 +29,7 @@ class User(Base, TimestampMixin):
     parent_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     balance = Column(Float, default=0.0)
     user_ip = Column(String(20), nullable=True)
+    user_location = Column(String(100), nullable=True)
     
 class UserSettings(Base,TimestampMixin):
     __tablename__ = "user_settings"

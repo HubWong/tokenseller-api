@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 """Script to update model_pricing currency to 'usd'"""
 import asyncio
-import os
 import sys
 from pathlib import Path
 

@@ -73,10 +73,10 @@ async def get_or_create_oauth_user(
     db: AsyncSession,
     email: str,
     provider: str,
-    provider_id: str = None,
-    name: str = None,
-    one_api_svc: OneAPISvc = None,
-    transaction_repo: TransactionRepo = None,
+    provider_id: Optional[str] = None,
+    name: Optional[str] = None,
+    one_api_svc: Optional[OneAPISvc] = None,
+    transaction_repo: Optional[TransactionRepo] = None,
 ) -> User:
     """获取或创建 OAuth 用户"""
     user = await user_crud.get_by_email(db, emailOrTel=email)
@@ -100,7 +100,6 @@ async def get_or_create_oauth_user(
     user = User(
         email=email,
         username=username,
-        hashed_password=get_password_hash(f"oauth_{provider}_{provider_id}"),
         is_active=True,
         oauth_provider=provider,
         oauth_id=provider_id,
@@ -110,7 +109,7 @@ async def get_or_create_oauth_user(
     await db.refresh(user)
 
     # 生成邀请码
-    user.invite_code = generate_invite_code(user.id)
+    user.invite_code = generate_invite_code(getattr(user,'id'))
     await db.commit()
     await db.refresh(user)
 

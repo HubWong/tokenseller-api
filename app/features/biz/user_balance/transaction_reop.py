@@ -20,6 +20,19 @@ class TransactionRepo:
                                  transaction_type: TransactionType) -> Transaction:
         return await self.consume_session(session, maker_id, amount, transaction_type)
     
+    async def query_transaction_sum(self, session: AsyncSession, maker_id: int) -> float:
+        try:
+            
+            stmt = select(func.sum(Transaction.amount)).where(
+                Transaction.maker_id == maker_id                             
+            )
+            result = await session.execute(stmt)    
+            total_amount = result.scalar() or 0.0
+            return total_amount
+        except Exception as e:
+            logger.error(f"Error querying transaction sum: {str(e)}")
+            return 0.0
+
     async def consume_session(
         self,
         session: AsyncSession,
@@ -31,17 +44,20 @@ class TransactionRepo:
         try:
             order_id = meta.get("id", None) if meta else None
             from_uid = meta.get('user_id',None) if meta else None
+
             if transaction_type != TransactionType.RECHARGE_FREE:             
                 mm=f'from {from_uid}'
             else:
                 mm=f'from {from_uid}'
-
+            balance_after = await self.query_transaction_sum(session, maker_id) 
+            balance_after += float(amount)
             data = Transaction(
                 maker_id=maker_id,
                 amount=amount,
                 type=transaction_type.value,
                 memo=mm,
-                ref_id = str(order_id)
+                ref_id = str(order_id),
+                balance_after=float(balance_after)
             )
             session.add(data)
             
@@ -76,7 +92,7 @@ class TransactionRepo:
             transactions = result.scalars().all()
 
             # Calculate total amount (absolute values)
-            total_amount = sum(abs(t.amount) for t in transactions) if transactions else 0.0
+            total_amount = sum(t.amount for t in transactions) if transactions else 0.0
 
             return transactions, total_amount
         except Exception as e:
@@ -165,7 +181,7 @@ class TransactionRepo:
 
             # 5. 查询【数据库级总金额】（不是内存求和，性能提升巨大）
             amount_stmt = (
-                select(func.sum(func.abs(Transaction.amount)))
+                select(func.sum(Transaction.amount))
                 .where(*query_conditions)
             )
             total_amount = await db.scalar(amount_stmt) or 0.0
@@ -186,7 +202,7 @@ class TransactionRepo:
         #result = {x:await token_cal_svc.money_to_tokens(amount=x,model=model_str) for x in money_list}
         return money_list
 
-    #????????
+   
     async def get_bill_datas(self, db: AsyncSession, *, user_id: int) -> Optional[Dict]:
         """Get user bill data by user_id"""
         

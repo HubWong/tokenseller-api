@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 # 从配置读取主密钥，避免硬编码
 MASTER_KEY = getattr(settings, "ONE_API_MASTERKEY", None)
-create_userapi = f"{settings.ONEAPI_URL}/api/user/"
+create_userapi = f"{settings.ONEAPI_URL}/api/user"
 MODEL_MAP = {
     "free": ["deepseek-chat"],
     "cheap": ["gpt-3.5", "deepseek-chat"],
@@ -222,7 +222,7 @@ class OneAPISvc:
         url = url or self.chat_url
         json_data = json_data or {}
         tracker = UsageTracker( messages=json_data.get("messages"), model=json_data.get("model",'default'))
-        logger.debug("requesting url => %s", url)
+        logger.debug("\n [*]:requesting url => %s", url)
         resp = await self.client.request(
             method=method,
             url=url,
@@ -278,7 +278,12 @@ class OneAPISvc:
         except httpx.HTTPStatusError as e:
             error_msg = f"Create user failed: {e.response.status_code} | {e.response.text[:800]}"
             logger.error(error_msg)
-            raise HTTPException(status_code=e.response.status_code, detail=error_msg) from e
+            #raise HTTPException(status_code=e.response.status_code, detail=error_msg) from e
+            return {"error": error_msg}
+        except Exception as e:
+            logger.exception("Unexpected error creating user")
+            #raise HTTPException(status_code=500, detail="Internal server error") from e
+            return {"error": "Internal server error"}
 
     async def close(self):
         """优雅关闭客户端"""

@@ -54,5 +54,6 @@ class Transaction(Base,TimestampMixin):
     source: Mapped[str] = mapped_column(String(100), nullable=True)
     # 可选：订单ID / 外部交易ID
     ref_id: Mapped[str] = mapped_column(String(100), nullable=True)
+    balance_after: Mapped[float] = mapped_column(Float, nullable=True)  # 变动后的余额快照
 
     
