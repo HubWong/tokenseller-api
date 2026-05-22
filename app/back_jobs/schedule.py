@@ -61,9 +61,12 @@ def stop_scheduler():
         
  
 def run_migrations():
-    """运行 Alembic 数据库迁移"""
-    alembic_cfg_path = os.path.join(settings.PROJECT_ROOT, "alembic.ini")
-    alembic_cfg = Config(alembic_cfg_path)
+    """运行 Alembic 数据库迁移，纯代码配置不依赖 alembic.ini"""
+    # schedule.py 在 app/back_jobs/ 下，migrations/ 在项目根目录
+    _project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    alembic_cfg = Config()
+    alembic_cfg.set_main_option("script_location", os.path.join(_project_root, "migrations"))
+    alembic_cfg.set_main_option("sqlalchemy.url", settings.SQL_DB_URL_Sync)
     command.upgrade(alembic_cfg, "head")
 
 
