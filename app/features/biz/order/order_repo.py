@@ -138,20 +138,30 @@ class OrderRepo():
         if old_order:
             await order_pool.add_order(old_order)
             return ApiResp(success=True,data= old_order)
-        try:  
-            new_address,idx=  await self.address_svc.get_address_by_redis()
-            print(f"🔑 获取新地址: {new_address}, idx: {idx}")
-            obj_in.to_address = new_address
-            obj_in.path_index= idx
-            obj_in.contract = ''
-            obj_in.currency = 'usdt'
-            obj_in.chain= 'tron'
-            obj_in.expired_at = datetime.now()+ timedelta(minutes=20)          
+        try:
+            if purchase.pay_way == 1:
+                # PayPal: 不需要区块链地址
+                obj_in.to_address = 'paypal'
+                obj_in.path_index = 0
+                obj_in.contract = ''
+                obj_in.currency = 'usd'
+                obj_in.chain = 'paypal'
+                obj_in.payment_channel = 'paypal'
+            else:
+                # TRON: 分配 HD 钱包地址
+                new_address, idx = await self.address_svc.get_address_by_redis()
+                print(f"🔑 获取新地址: {new_address}, idx: {idx}")
+                obj_in.to_address = new_address
+                obj_in.path_index = idx
+                obj_in.contract = ''
+                obj_in.currency = 'usdt'
+                obj_in.chain = 'tron'
+            obj_in.expired_at = datetime.now() + timedelta(minutes=20)
             obj_data = obj_in.model_dump(exclude_unset=True)
             db_obj = Order(**obj_data)
 
             self.db.add(db_obj)
-           
+
             await self.db.commit()
             await self.db.refresh(db_obj)
             OrderOut = OrderInDBBase.model_validate(db_obj)

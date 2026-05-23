@@ -100,6 +100,11 @@ async def get_apikey_crud():
 async def get_data_collector(db:AsyncSession= Depends(get_db)):
     return DataCollector(db=db)
 
+
+async def get_paypal_svc():
+    from app.services.paypal_svc import PayPalSvc
+    return PayPalSvc()
+
 # ✅ 1. 修复：get_user_by_token —— 改为异步查询 + await
 async def get_user_by_token(
     db: AsyncSession = Depends(get_db),

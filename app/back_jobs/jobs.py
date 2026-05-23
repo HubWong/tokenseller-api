@@ -1,7 +1,6 @@
 from datetime import datetime
 from app.core.database import AsyncSessionLocal
 from app.back_jobs.db_tasks import clean_expired_files_db
-from app.features.socket.socket_models import room_manager
 
 import asyncio
 

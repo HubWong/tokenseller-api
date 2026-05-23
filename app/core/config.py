@@ -41,8 +41,8 @@ class Settings(BaseSettings):
     # Security
     SECRET_KEY: str = os.getenv("SECRET_KEY", "")
     SECRET_KEY_ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 1  # 1 minute
-    REFRESH_TOKEN_EXPIRE_MINUTES:int = 5  # 5 minutes
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 16  # 16 minutes
+    REFRESH_TOKEN_EXPIRE_MINUTES:int = 60*24*7  
     EXPIRE_TOKEN_MINUTES_LOST_PWD: int = 10  # Token过期时间，单位为分钟
 
 
@@ -69,6 +69,8 @@ class Settings(BaseSettings):
     # Payment
     PAYPAL_CLIENT_ID: Optional[str] = os.getenv("PAYPAL_CLIENT_ID")
     PAYPAL_CLIENT_SECRET: Optional[str] = os.getenv("PAYPAL_CLIENT_SECRET")
+    PAYPAL_MODE: str = os.getenv("PAYPAL_MODE", "sandbox")  # sandbox or live
+    PAYPAL_BASE_URL: str = "https://api-m.sandbox.paypal.com" if PAYPAL_MODE == "sandbox" else "https://api-m.paypal.com"
     XPUB_tron:str = 'xpub6BsVPv5EsdwgcnkYP5DQ7xnY4tYn49ewY3aygAxpcYKRFa8JiGZpLNpm82pZXJUMJeddMQZXX4iYMjzoqyWSZvWrHBJmg7nPFXjQQ5xz6VL'
     PAYONEER_WEBHOOK_URL: str = os.getenv("PAYONEER_WEBHOOK_URL", "http://localhost:3001/api/payoneer/status")
     
