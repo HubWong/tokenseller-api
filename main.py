@@ -7,19 +7,10 @@ from fastapi import FastAPI,Depends
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware  # 
 from app.core.req_limiter import rate_limit_middleware
-from app.api.v1.auth_api import router as auth_router
-from app.api.v1.notify_api import router as notify_router
-from app.api.v1.chat_api import router as chat_router
-from app.api.v1.order_api import router as orders_router
-from app.api.v1.oauth_api import router as oauth_router
-from app.api.v1.balance_api import router as balance_router
-from app.api.v1.admin_api import router as admin_router
-from app.api.v1.usage_api import router as usage_router
-from app.api.v1.apikey_api import router as apikey_router
-from app.api.v1.models_api import router as models_router
 from app.back_jobs.schedule import lifespanJob
 from app.core.deps import get_price_repo
 from app.features.biz.order.price_repo import PriceRepo
+from app.api.v1 import api_router
 from app.core.config import settings
 
 
@@ -50,18 +41,8 @@ app.add_middleware(
 app.middleware("http")(rate_limit_middleware)
 # ============== Register Routers ==============
 
-app.include_router(auth_router, prefix="")
-app.include_router(notify_router, prefix="")
-app.include_router(chat_router, prefix="")
-app.include_router(orders_router, prefix="")
-app.include_router(oauth_router, prefix="")
-app.include_router(balance_router, prefix="")
-app.include_router(usage_router, prefix="")
-app.include_router(admin_router, prefix="")
-app.include_router(apikey_router,prefix="")
-app.include_router(models_router, prefix="")
+app.include_router(api_router, prefix="") 
 
-# ============== API Endpoints ==============
 
 @app.get("/")
 async def root():

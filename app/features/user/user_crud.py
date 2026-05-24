@@ -9,7 +9,6 @@ from app.features.crud_base import CRUDBase
 from app.features.db_base import ApiResp
 from app.core.config import settings
 from app.features.user.model.user_model import User,UserRole
-from app.features.user.model.user_photo import Photo
 from app.features.user.token_crud import token_crud
 from app.features.admin.admin_schema import AdminUserUpdate, AdminConsoleData
 from app.features.user.schemas.token_schema import LostPasswordReset, TokenSchemaUser

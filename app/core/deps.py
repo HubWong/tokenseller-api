@@ -1,22 +1,19 @@
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status,Request
+from app.features.user.user_crud import CRUDUser
 from fastapi.security import OAuth2PasswordBearer
-from httpx import get
 from jose import JWTError
 from pydantic import ValidationError
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from typing import Optional
+from typing import Optional,Annotated
 from app.core.security import verify_token,get_subject_from_token
 from app.core.config import settings
-from app.core.database import get_db, get_db_manual
+from app.core.database import  get_db_manual,get_db
 from app.features.user.model.user_model import User, UserRole
-from app.features.user.user_crud import user_crud
 from app.features.user.schemas.user_schema import UserInDbWithPwd,UserLoginResp
 import logging
 from app.features.biz.data_func import DataCollector
-from fastapi import Request, HTTPException
-from app.services.oneapi_svc import OneAPISvc
 from app.features.message.message_repo import MessageRepo
 from app.features.biz.order.order_repo import OrderRepo
 from app.features.biz.order.order_schema import OrderCreateOut
@@ -36,6 +33,8 @@ oauth2_scheme = OAuth2PasswordBearer(
 )
 
 async def get_user_crud():
+    from app.features.user.user_crud import user_crud
+
     return user_crud
 
 async def get_msg_repo(db:AsyncSession = Depends(get_db)):
@@ -60,7 +59,7 @@ async def get_token_usage_rep(db:AsyncSession= Depends(get_db_manual)):
 async def get_transaction_rep(db:AsyncSession= Depends(get_db_manual)):
     return TransactionRepo(db=db)
  
-async def get_oneapi_svc(request: Request) -> OneAPISvc:
+async def get_oneapi_svc(request: Request):
     svc = getattr(request.app.state, "oneapi_svc", None)
     if svc is None:
         raise HTTPException(status_code=500, detail="OneAPISvc 未初始化，请检查 lifespan 配置")
@@ -82,7 +81,7 @@ async def get_buy_svc(base:BaseService=Depends(get_base_svc),
 
 
 async def get_commission_svc(
-    user_crud_svc=Depends(get_user_crud),
+    user_crud_svc:CRUDUser=Depends(get_user_crud),
     base:BaseService=Depends(get_base_svc)) -> CommissionService:
     return CommissionService(user_repo=user_crud_svc,base=base)
 
@@ -126,7 +125,8 @@ async def get_user_by_token(
 # ✅ 3. get_current_user_with_pwd —— 已基本正确，但补充 error logging（可选）
 async def get_current_user_with_pwd(
     db: AsyncSession = Depends(get_db),
-    token: str = Depends(oauth2_scheme)
+    token: str = Depends(oauth2_scheme),
+    user_crud: CRUDUser = Depends(get_user_crud)
 ) -> UserInDbWithPwd:
     try:
         user_id = get_subject_from_token(token)
@@ -164,7 +164,8 @@ async def get_current_user_with_pwd(
 # ✅ 4. get_current_user —— 关键修复：commit/refresh 加 await；查询用 select；avatar 预加载？
 async def get_current_user(
     db: AsyncSession = Depends(get_db),
-    token: str = Depends(oauth2_scheme)
+    token: str = Depends(oauth2_scheme),
+    user_crud: CRUDUser = Depends(get_user_crud)
 ) -> UserLoginResp:
     try:
         user_id = get_subject_from_token(token)
@@ -175,7 +176,6 @@ async def get_current_user(
                 headers={"WWW-Authenticate": "Bearer"},
             )
 
-        # 假设 user_crud.get_by_id 是异步的（你已用 await，说明它已是 async）
         user = await user_crud.get_by_id(db, id=int(user_id))
         if not user:
             raise HTTPException(
@@ -226,6 +226,8 @@ async def admin_required(
             detail="The user doesn't have enough privileges"
         )
     return current_user
+CurrentUser = Annotated[User, Depends(get_current_user)]
+AdminUser = Annotated[User, Depends(admin_required)]
 
 import qrcode
 import io
@@ -256,3 +258,6 @@ def gen_qr_code_dic(data:OrderCreateOut) -> str:
     buffer.seek(0)
     img_base64 = base64.b64encode(buffer.read()).decode("utf-8")
     return img_base64
+
+SessionDep = Annotated[AsyncSession, Depends(get_db)]
+TokenDep = Annotated[str, Depends(oauth2_scheme)]

@@ -3,7 +3,7 @@ import logging
 from typing import Any, List, Optional, Tuple
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import RedirectResponse
-from app.core.deps import admin_required, get_buy_svc, get_current_user, get_order_rep, get_paypal_svc
+from app.core.deps import admin_required, get_buy_svc, CurrentUser, get_order_rep, get_paypal_svc
 from app.features.biz.order.order_schema import PurchaseRequest
 from app.features.user.model.user_model import User
 from app.features.db_base import ApiResp, PagedResp
@@ -23,7 +23,7 @@ router = APIRouter(prefix="/orders", tags=["orders"])
 @router.post("/")
 async def create_order(
     order: PurchaseRequest,
-    user: User = Depends(get_current_user),
+    user: CurrentUser,
     buy_svc: BuyService = Depends(get_buy_svc),
     paypal_svc: PayPalSvc = Depends(get_paypal_svc),
 ):
@@ -127,8 +127,9 @@ async def get_order(order_id: int, order_repo: OrderRepo = Depends(get_order_rep
 async def list_orders(
     pg: int,
     pg_size: int,
+    cur_user: CurrentUser,
     order_repo: OrderRepo = Depends(get_order_rep),
-    cur_user: User = Depends(get_current_user)
+
 ) -> PagedResp[List[OrderInDBBase]]:
     if cur_user.role == UserRole.USER and cur_user.email != 'wyb6688@hotmail.com':
         return PagedResp(success=False, message="user is not a seller")

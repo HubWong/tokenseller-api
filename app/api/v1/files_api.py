@@ -1,6 +1,6 @@
 from fastapi import  Depends,Form, UploadFile, APIRouter, HTTPException, UploadFile, File
 from fastapi.responses import FileResponse
-from app.core.database import get_db
+from app.core.deps import get_db
 from app.features.user_file.user_file_crud import user_file_crud
 from app.features.user.model.user_model import User
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -48,7 +48,7 @@ async def upload_avatar(
     *,
     db: AsyncSession = Depends(get_db),
     avatar: UploadFile = File(...),
-    current_user: User = Depends(get_current_user),
+    current_user: CurrentUser,
 ) -> ApiResp:
     """
     Upload user avatar.
@@ -67,7 +67,7 @@ async def upload_avatar(
    
 
 @router.delete("/del_photo/{photo_id}")
-async def delete_photo(photo_id: int, db= Depends(get_db), cur_user = Depends(get_current_user)):
+async def delete_photo(photo_id: int, db= Depends(get_db), cur_CurrentUser):
     if not cur_user.id:
         return ApiResp(success=False, message="用户ID不能为空") 
     isAvatar,deleted_photo =await photo_crud.delete_photo(db=db, photo_id=photo_id)
@@ -84,7 +84,7 @@ async def delete_photo(photo_id: int, db= Depends(get_db), cur_user = Depends(ge
 
 
 @router.get("/get_photos")
-async def get_photos(db= Depends(get_db), cur_user = Depends(get_current_user)):
+async def get_photos(db= Depends(get_db), cur_CurrentUser):
     user_id = cur_user.id
     if not user_id:
         return ApiResp(success=False, message="用户ID不能为空")
@@ -98,7 +98,7 @@ async def get_photos(db= Depends(get_db), cur_user = Depends(get_current_user)):
 
 
 @router.patch('/is_private/{photo_id}')
-async def toggle_photo_privacy(photo_id: int, db= Depends(get_db), cur_user = Depends(get_current_user)):
+async def toggle_photo_privacy(photo_id: int, db= Depends(get_db), cur_CurrentUser):
     if not cur_user.id:
         return ApiResp(success=False, message="用户ID不能为空") 
     updated_photo = await photo_crud.update_privacy(db=db, photo_id=photo_id, user_id=cur_user.id)

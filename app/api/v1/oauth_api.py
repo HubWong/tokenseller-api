@@ -6,7 +6,7 @@ from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 
 from app.core.config import settings
-from app.core.database import get_db
+from app.core.deps import get_db
 from app.features.biz.user_balance.models import TransactionType
 from app.features.user.user_crud import user_crud
 from app.features.user.model.user_model import User

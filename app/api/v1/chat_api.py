@@ -4,7 +4,7 @@ Token Purchase API - Integrated from main.py MVP features
 """
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.core.database import get_db
+from app.core.deps import get_db
 from app.services.oneapi_svc import OneAPISvc
 from app.core.deps import get_oneapi_svc,get_consume_svc, get_token_usage_rep
 from app.core.abc_biz import ConsumeService

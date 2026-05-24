@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.core.database import get_db
+from app.core.deps import get_db
 from app.features.db_base import ApiResp
 from app.features.biz.user_balance import transaction_reop
 from app.features.biz.user_balance.schemas import UserBalanceCreate

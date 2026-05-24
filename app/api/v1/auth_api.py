@@ -2,7 +2,6 @@ from datetime import datetime,timezone
 from typing import Any,Optional
 from fastapi import APIRouter, Body, Depends,  status
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.socket.manager import manager
 from app.features.db_base import ApiResp
 from app.core.security import (
     create_access_token,
@@ -10,11 +9,11 @@ from app.core.security import (
     verify_password,    
     get_subject_from_token
 )
-from app.core.database import get_db
+from app.core.deps import get_db
+from app.socket.manager import manager
+
 from app.features.user.user_crud import user_crud
-from app.core.database import get_db
-from app.features.user.model.user_model import User
-from app.core.deps import get_current_user, get_current_user_with_pwd, get_oneapi_svc, get_transaction_rep
+from app.core.deps import CurrentUser, get_current_user_with_pwd, get_oneapi_svc, get_transaction_rep
 from app.features.user.photo_crud import photo_crud
 from app.features.user.schemas.token_schema import (
     PasswordResetRequest,
@@ -136,8 +135,9 @@ async def pwd_lost_reset(
 
 @router.post('/logout', response_model=ApiResp[Optional[bool]])
 async def logout(
+    current_user:CurrentUser,
     db: AsyncSession = Depends(get_db),
-    current_user: UserLoginResp = Depends(get_current_user)
+
 ) -> ApiResp[Optional[bool]]:
     """
     Logout user by deleting the refresh token.
@@ -148,7 +148,7 @@ async def logout(
 
 @router.get("/me")
 def get_my_profile(
-    current_user: UserInDB = Depends(get_current_user),
+    current_user: CurrentUser,
 ) -> ApiResp[Optional[UserInDB]]:
     """
     Get current user information.
@@ -165,7 +165,7 @@ async def update_user(id:int,username:UpdateUsername,db:AsyncSession=Depends(get
 async def get_current_user_avatar(
     *,
     db: AsyncSession = Depends(get_db),
-    current_user = Depends(get_current_user),
+    current_CurrentUser,
 ) -> ApiResp[Optional[str]]:
     return await photo_crud.get_avatar_base64(db=db, user=current_user)
 
@@ -174,7 +174,7 @@ async def update_current_user_avatar(
     *,
     db: AsyncSession = Depends(get_db),
     avatar_url: str = Body(..., embed=True),
-    current_user = Depends(get_current_user),
+    current_CurrentUser,
 ) -> ApiResp[Any]:
     """
     Update current user's avatar.
@@ -190,7 +190,7 @@ async def update_profile(
     *,
     db: AsyncSession = Depends(get_db),
     user_in: UserCvUpdate,    
-    current_user :User = Depends(get_current_user),
+    current_user :CurrentUser,
 ) -> ApiResp[Optional[UserLoginResp]]:
     """
     Update current user information.
