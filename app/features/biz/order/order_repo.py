@@ -132,9 +132,9 @@ class OrderRepo():
     async def create(self,  purchase:PurchaseRequest, user_id:int) -> ApiResp:
         obj_in = OrderCreateIn(**purchase.model_dump())
         obj_in.user_id = user_id
-        old_order =await self.get_pending_order(user_id=obj_in.user_id,
-                                                amount=obj_in.amount,
-                                                item_id=obj_in.pay_way)
+        old_order =await self.get_pending_order(user_id= obj_in.user_id,
+                                                amount= obj_in.amount,
+                                                item_id= obj_in.pay_way)
         if old_order:
             await order_pool.add_order(old_order)
             return ApiResp(success=True,data= old_order)
@@ -146,7 +146,8 @@ class OrderRepo():
                 obj_in.contract = ''
                 obj_in.currency = 'usd'
                 obj_in.chain = 'paypal'
-                obj_in.payment_channel = 'paypal'
+                obj_in.pay_way = 1
+                
             else:
                 # TRON: 分配 HD 钱包地址
                 new_address, idx = await self.address_svc.get_address_by_redis()
@@ -156,6 +157,7 @@ class OrderRepo():
                 obj_in.contract = ''
                 obj_in.currency = 'usdt'
                 obj_in.chain = 'tron'
+                obj_in.pay_way = 2
             obj_in.expired_at = datetime.now() + timedelta(minutes=20)
             obj_data = obj_in.model_dump(exclude_unset=True)
             db_obj = Order(**obj_data)
@@ -165,7 +167,8 @@ class OrderRepo():
             await self.db.commit()
             await self.db.refresh(db_obj)
             OrderOut = OrderInDBBase.model_validate(db_obj)
-            await order_pool.add_order(OrderOut)
+            if purchase.pay_way == 2:
+                await order_pool.add_order(OrderOut)
 
             return ApiResp(success=True, message="创建订单成功", data=OrderOut)
 

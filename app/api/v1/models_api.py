@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
-from typing import Any, List, Optional
-from fastapi import APIRouter, Depends, HTTPException
+from typing import List
+from fastapi import APIRouter, Depends
 from app.features.biz.order.order_schema import ModelPricingCreate, ModelPricingResponse, ModelPricingUpdate
 from app.core.deps import get_price_repo, admin_required
 from app.features.biz.order.price_repo import PriceRepo
@@ -49,16 +49,17 @@ async def create_model(
         if existing:
             return ApiResp(success=False, message=f"Model {model_data.model_name} already exists")
 
-        model = await price_repo.create_pricing(
-            input_cost=model_data.input_cost,
-            output_cost=model_data.output_cost,
+        model = await price_repo.create_model(
+            input_cost=model_data.input_cost or 0.006,
+            output_cost=model_data.output_cost or 0.012,
             model_name=model_data.model_name,
             input_price=model_data.input_price,
             output_price=model_data.output_price,
-            currency=model_data.currency,
-            is_active=model_data.is_active,
+            currency=model_data.currency or 'USD',
+            is_active=model_data.is_active or True,
             level=model_data.level
         )
+       
         return ApiResp(success=True, data=ModelPricingResponse.model_validate(model))
     except Exception as e:
         return ApiResp(success=False, message=str(e))

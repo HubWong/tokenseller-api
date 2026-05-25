@@ -3,7 +3,7 @@ from typing import  List
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.features.biz.user_balance.schemas import RecentRequestResponse, DashboardStatsResponse,UsageStatsResponse
-from app.core.deps import get_token_usage_rep, CurrentUser, get_data_collector
+from app.core.deps import get_token_usage_rep, DepUser, get_data_collector
 from app.features.user.model.user_model import User
 from app.features.biz.data_func import DataCollector
 from app.features.biz.usage.token_usage_repo import TokenUsageRepo
@@ -17,7 +17,7 @@ router = APIRouter(prefix="/usage", tags=["usage"])
 
 @router.get("/stats", response_model=DashboardStatsResponse)
 async def get_dashboard_stats( 
-    current_user: CurrentUser,
+    current_user: DepUser,
     token_repo :TokenUsageRepo = Depends(get_token_usage_rep),
     data_collector: DataCollector = Depends(get_data_collector)
 ):
@@ -26,7 +26,7 @@ async def get_dashboard_stats(
 
 @router.get("/daily", response_model=list[UsageStatsResponse])
 async def get_daily_usage(
-    current_user: CurrentUser,
+    current_user: DepUser,
     days: int = Query(7, ge=1, le=30, description="Number of days (1-30)"),
     data_collector:DataCollector = Depends(get_data_collector),
     token_repo :TokenUsageRepo = Depends(get_token_usage_rep)
@@ -40,7 +40,7 @@ async def get_daily_usage(
 
 @router.get("/token_log", response_model=List[RecentRequestResponse])
 async def get_token_log(
-    current_user: CurrentUser,
+    current_user: DepUser,
     limit: int = Query(10, ge=1, le=50, description="Number of recent requests"),
     data_collector: DataCollector = Depends(get_data_collector),
     db:AsyncSession = Depends(get_db)

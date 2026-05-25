@@ -1,19 +1,19 @@
-from pydantic import Json
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import Update, select, update, delete
 from typing import Any, Optional, List
 from app.features.biz.order.order_model import ModelPricing
-from sqlalchemy.types import Numeric
 from decimal import Decimal
 import httpx
 from app.core.config import settings
+from app.services.tools_svc import check_api_reachable
+
 
 
 class PriceRepo:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def create_pricing(
+    async def create_model(
         self,
         model_name: str,
         input_cost: float,
@@ -44,6 +44,9 @@ class PriceRepo:
             self.db.add(pricing)
             await self.db.commit()
             await self.db.refresh(pricing)
+            if check_api_reachable(settings.ONEAPI_URL,3):
+               from app.core.application import fapp
+               await fapp.state.oneapi_svc.create_model(model_name, input_cost, output_cost)
             return pricing
         except Exception as e:
             await self.db.rollback()
@@ -157,19 +160,7 @@ class PriceRepo:
         result = await self.db.execute(stmt)
         await self.db.commit()
         return result.rowcount > 0
-
-    async def get_or_create_default(self) -> ModelPricing:
-        """Get or create default pricing"""
-        default_pricing = await self.get_pricing_by_model("default")
-        if not default_pricing:
-            default_pricing = await self.create_pricing(
-                model_name="default",
-                input_price=0.01,
-                output_price=0.03,
-                currency="USD",
-                is_active=True
-            )
-        return default_pricing
+ 
 
     async def seed_pricing(self) -> int:
         """Seed initial pricing data into the database"""
@@ -257,7 +248,7 @@ class PriceRepo:
         for model_name, price_data in prices.items():
             existing = await self.get_pricing_by_model(model_name)
             if not existing:
-                await self.create_pricing(
+                await self.create_model(
                     model_name=model_name,
                     input_price=float(price_data["input"]),
                     output_price=float(price_data["output"]),

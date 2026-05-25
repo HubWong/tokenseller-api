@@ -38,9 +38,15 @@ class BaseService(BaseServiceABC):
         # 修复：增加空值判断
         if not db:
             raise ValueError("AsyncSession cannot be None")
-        stmt = update(User).where(User.id == user_id).values(balance=User.balance + amount)
-        await db.execute(stmt)
-        await db.commit()
+        try:
+            stmt = update(User).where(User.id == user_id).values(balance=User.balance + amount)
+            await db.execute(stmt)
+            
+        except SQLAlchemyError as e:
+            logger.error(f"Failed to update user {user_id} balance: {str(e)}", exc_info=True)
+            raise
+
+        logger.info(f"Updated user {user_id} balance with {amount}")
 
 
 class BuyService(BaseService, BuyServiceABC):
@@ -56,12 +62,15 @@ class BuyService(BaseService, BuyServiceABC):
     async def create_order(self, purchase: PurchaseRequest, user_id: int):
         return await self.order_repo.create(user_id=user_id, purchase=purchase)
 
-    async def pay_order(self, order_id, order_data):
+    async def pay_order(self, order_id):
         async for session in get_db_manual():
             try:
                 order = await self.order_repo.pay_order(order_id=order_id, session=session, status=OrderStatus.SUCCESS)
                 if not order:
                     return False
+                #update user role if needed 
+                
+                await self.update_user(user_id=order.user_id, amount=order.amount, db=session)
 
                 meta = to_dict(order)
                 # 修复：统一使用 session 事务
@@ -71,9 +80,9 @@ class BuyService(BaseService, BuyServiceABC):
 
                 await session.commit()
                 return True
-            except Exception:
+            except Exception as e:
                 await session.rollback()
-                logger.exception("Pay order failed")
+                logger.exception("Pay order failed",str(e))
                 raise
 
     async def refund(self, user_id: int, amount: float, reason: str):

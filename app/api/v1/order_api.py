@@ -3,7 +3,7 @@ import logging
 from typing import Any, List, Optional, Tuple
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import RedirectResponse
-from app.core.deps import admin_required, get_buy_svc, CurrentUser, get_order_rep, get_paypal_svc
+from app.core.deps import admin_required, get_buy_svc, DepUser, get_order_rep, get_paypal_svc
 from app.features.biz.order.order_schema import PurchaseRequest
 from app.features.user.model.user_model import User
 from app.features.db_base import ApiResp, PagedResp
@@ -23,7 +23,7 @@ router = APIRouter(prefix="/orders", tags=["orders"])
 @router.post("/")
 async def create_order(
     order: PurchaseRequest,
-    user: CurrentUser,
+    user: DepUser,
     buy_svc: BuyService = Depends(get_buy_svc),
     paypal_svc: PayPalSvc = Depends(get_paypal_svc),
 ):
@@ -36,7 +36,7 @@ async def create_order(
         return_url = f"{backend_url}/orders/paypal/success"
         cancel_url = f"{frontend_url}/app/billing?payment=cancelled"
 
-        paypal_order = await paypal_svc.create_order(
+        paypal_order = await paypal_svc.create_paypal_order(
             amount_usd=order.amount,
             order_id=db_order.id,
             return_url=return_url,
@@ -88,7 +88,7 @@ async def paypal_success(
             logger.warning("PayPal order unexpected status %s: %s", token, paypal_order.get("status"))
             return RedirectResponse(url=f"{frontend_url}/app/billing?payment=error")
 
-        paid = await buy_svc.pay_order(order_id, {"paypal_order_id": token})
+        paid = await buy_svc.pay_order(order_id)
         if paid:
             await order_pool.remove_order(order_id)
             await order_pool.publish_payment(order_id, {
@@ -127,7 +127,7 @@ async def get_order(order_id: int, order_repo: OrderRepo = Depends(get_order_rep
 async def list_orders(
     pg: int,
     pg_size: int,
-    cur_user: CurrentUser,
+    cur_user: DepUser,
     order_repo: OrderRepo = Depends(get_order_rep),
 
 ) -> PagedResp[List[OrderInDBBase]]:

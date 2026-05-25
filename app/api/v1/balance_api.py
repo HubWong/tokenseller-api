@@ -3,8 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.deps import get_db
 from app.features.db_base import ApiResp
 from app.features.biz.user_balance import transaction_reop
-from app.features.biz.user_balance.schemas import UserBalanceCreate
-from app.core.deps import get_token_cal_svc, get_transaction_rep, get_current_user,get_token_usage_rep
+from app.core.deps import get_token_cal_svc, get_transaction_rep, DepUser
 from app.features.user.model.user_model import User
 from app.features.biz.usage.model import TokenUsageLog
 from app.services.token_money_svc import TokenCostCalculator
@@ -46,10 +45,10 @@ async def get_balance(api_key: str, db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/billData")
-async def get_bill_data( db:AsyncSession=Depends(get_db),
-                        token_cal_svc :TokenCostCalculator = Depends(get_token_cal_svc),
+async def get_bill_data( cur_user: DepUser,
+                        db:AsyncSession=Depends(get_db),
                         trans_rep :transaction_reop.TransactionRepo = Depends(get_transaction_rep),  
-                        cur_user:User=Depends(get_current_user)):
+                         ):
     """Get user bill data."""
     user_id = cur_user.id
     return await trans_rep.get_bill_datas(db=db,user_id=user_id)

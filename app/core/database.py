@@ -18,10 +18,23 @@ AsyncSessionLocal = async_sessionmaker(
 
 
 def to_dict(model_instance):
-    return {
-        c.name: getattr(model_instance, c.name)
-        for c in model_instance.__table__.columns
-    }
+    """异步安全版：不访问 __table__，避免同步IO"""
+    if not model_instance:
+        return {}
+    
+    # 手动指定字段（最安全）
+    fields = [
+        "id", "user_id", "amount", "status",
+        "created_at", "updated_at"  # 你有什么字段加什么
+    ]
+    
+    result = {}
+    for field in fields:
+        try:
+            result[field] = getattr(model_instance, field)
+        except:
+            pass
+    return result
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:

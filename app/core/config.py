@@ -70,7 +70,7 @@ class Settings(BaseSettings):
     PAYPAL_CLIENT_ID: Optional[str] = os.getenv("PAYPAL_CLIENT_ID")
     PAYPAL_CLIENT_SECRET: Optional[str] = os.getenv("PAYPAL_CLIENT_SECRET")
     PAYPAL_MODE: str = os.getenv("PAYPAL_MODE", "sandbox")  # sandbox or live
-    PAYPAL_BASE_URL: str = "https://api-m.sandbox.paypal.com" if PAYPAL_MODE == "sandbox" else "https://api-m.paypal.com"
+    PAYPAL_BASE_URL: str = "https://sandbox.paypal.com" if PAYPAL_MODE == "sandbox" else "https://sandbox.paypal.com"
     XPUB_tron:str = 'xpub6BsVPv5EsdwgcnkYP5DQ7xnY4tYn49ewY3aygAxpcYKRFa8JiGZpLNpm82pZXJUMJeddMQZXX4iYMjzoqyWSZvWrHBJmg7nPFXjQQ5xz6VL'
     PAYONEER_WEBHOOK_URL: str = os.getenv("PAYONEER_WEBHOOK_URL", "http://localhost:3001/api/payoneer/status")
     
@@ -106,7 +106,7 @@ class Settings(BaseSettings):
     # Frontend URL for OAuth callbacks
     # OAUTH_REDIRECT_URL: str = os.getenv("OAUTH_REDIRECT_URL", "https://tokenmaker.ccwu.cc")
     # Backend URL for OAuth provider redirect_uri (OAuth providers redirect back here)
-    BACKEND_URL: str = os.getenv("BACKEND_URL", "https://tokenseller-api-production.up.railway.app")
+    BACKEND_URL: str = os.getenv("FRONTEND_URL", "https://tokenseller-api-production.up.railway.app")
     BILL_PRICE_SET :list[float] = [10,25,50,100,200,500]
     RESEND_API_KEY: str = os.getenv("RESEND_API_KEY", "")
     

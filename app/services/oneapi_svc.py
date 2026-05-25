@@ -30,14 +30,10 @@ logger = logging.getLogger(__name__)
 # 从配置读取主密钥，避免硬编码
 MASTER_KEY = getattr(settings, "ONE_API_MASTERKEY", None)
 create_userapi = f"{settings.ONEAPI_URL}/api/user"
-MODEL_MAP = {
-    "free": ["deepseek-chat"],
-    "cheap": ["gpt-3.5", "deepseek-chat"],
-    "pro": ["gpt-4", "claude-3"],
-    "ultra": ["claude-3"],
-}
+
 PRICE_INPUT = Decimal("0.002")
 PRICE_OUTPUT = Decimal("0.004")
+
 
 
 def resolve_model(tier: str, model_price_cache: dict) -> List[str]:
@@ -268,6 +264,46 @@ class OneAPISvc:
         return await self._request(method="GET", 
                                    url=self.models_url,
                                    json_data={})
+
+    async def oneapi_request(self,  
+                                url: str,
+                                json_data: Dict[str, Any] | None,
+                                method: str = "POST"
+                                ) -> Tuple[Dict, Dict]:
+        
+        """外部调用的统一请求接口，自动重试"""
+        try:
+            logger.debug("\n [*]:requesting url => %s", url)
+            resp = await self.client.request(
+                method=method,
+                url=url,
+                headers=self._headers(),
+                json=json_data,
+            )
+            if resp.status_code >= 400:
+                text = await resp.aread()
+                error_msg = f"HTTP {resp.status_code}: {text[:800]}"
+                if resp.status_code in (429, 500, 502, 503, 504):
+                    raise RetryableAPIError(error_msg)
+                raise OneAPIError(error_msg)
+            return resp.json()
+        
+        except RetryableAPIError as e:
+            logger.warning("Retryable error occurred: %s", str(e))
+            raise
+        except OneAPIError as e:
+            logger.error("OneAPI error occurred: %s", str(e))
+            raise
+        except Exception as e:
+            logger.exception("Unexpected error in request_with_retry")
+            raise OneAPIError("Unexpected error") from e
+
+    async def create_model(self, model_name: str, input_cost: float, output_cost: float) -> Tuple[Dict, Dict]:
+        return await self.oneapi_request(
+            url=f"{self.base_url}/api/model",
+            json_data={"name": model_name, "input_cost": input_cost, "output_cost": output_cost},
+            method="POST"
+        )
 
     async def create_oneapi_user(self, username: str, pwd: str, access_token: str) -> Dict:
         """全局 access_token 改为参数注入，完善异常处理"""

@@ -43,6 +43,13 @@ async def get_msg_repo(db:AsyncSession = Depends(get_db)):
 async def get_address_pool_repo(db:AsyncSession =Depends(get_db),redis:Redis = Depends(get_redis)):
     return AddressSvc(db=db,redis=redis)
 
+async def get_oneapi_svc(request: Request):
+    svc = getattr(request.app.state, "oneapi_svc", None)
+    if svc is None:
+        raise HTTPException(status_code=500, detail="OneAPISvc 未初始化，请检查 lifespan 配置")
+    return svc
+
+
 async def get_price_repo(db:AsyncSession=Depends(get_db)):
     return PriceRepo(db=db)
 
@@ -59,11 +66,6 @@ async def get_token_usage_rep(db:AsyncSession= Depends(get_db_manual)):
 async def get_transaction_rep(db:AsyncSession= Depends(get_db_manual)):
     return TransactionRepo(db=db)
  
-async def get_oneapi_svc(request: Request):
-    svc = getattr(request.app.state, "oneapi_svc", None)
-    if svc is None:
-        raise HTTPException(status_code=500, detail="OneAPISvc 未初始化，请检查 lifespan 配置")
-    return svc
 
 
 async def get_base_svc(transc_rep:TransactionRepo = Depends(get_transaction_rep)) -> BaseService:  
@@ -226,7 +228,7 @@ async def admin_required(
             detail="The user doesn't have enough privileges"
         )
     return current_user
-CurrentUser = Annotated[User, Depends(get_current_user)]
+DepUser = Annotated[User, Depends(get_current_user)]
 AdminUser = Annotated[User, Depends(admin_required)]
 
 import qrcode

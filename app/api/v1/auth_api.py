@@ -13,7 +13,7 @@ from app.core.deps import get_db
 from app.socket.manager import manager
 
 from app.features.user.user_crud import user_crud
-from app.core.deps import CurrentUser, get_current_user_with_pwd, get_oneapi_svc, get_transaction_rep
+from app.core.deps import DepUser, get_current_user_with_pwd, get_oneapi_svc, get_transaction_rep
 from app.features.user.photo_crud import photo_crud
 from app.features.user.schemas.token_schema import (
     PasswordResetRequest,
@@ -135,7 +135,7 @@ async def pwd_lost_reset(
 
 @router.post('/logout', response_model=ApiResp[Optional[bool]])
 async def logout(
-    current_user:CurrentUser,
+    current_user:DepUser,
     db: AsyncSession = Depends(get_db),
 
 ) -> ApiResp[Optional[bool]]:
@@ -148,7 +148,7 @@ async def logout(
 
 @router.get("/me")
 def get_my_profile(
-    current_user: CurrentUser,
+    current_user: DepUser,
 ) -> ApiResp[Optional[UserInDB]]:
     """
     Get current user information.
@@ -165,7 +165,7 @@ async def update_user(id:int,username:UpdateUsername,db:AsyncSession=Depends(get
 async def get_current_user_avatar(
     *,
     db: AsyncSession = Depends(get_db),
-    current_CurrentUser,
+    current_DepUser,
 ) -> ApiResp[Optional[str]]:
     return await photo_crud.get_avatar_base64(db=db, user=current_user)
 
@@ -174,7 +174,7 @@ async def update_current_user_avatar(
     *,
     db: AsyncSession = Depends(get_db),
     avatar_url: str = Body(..., embed=True),
-    current_CurrentUser,
+    current_DepUser,
 ) -> ApiResp[Any]:
     """
     Update current user's avatar.
@@ -190,7 +190,7 @@ async def update_profile(
     *,
     db: AsyncSession = Depends(get_db),
     user_in: UserCvUpdate,    
-    current_user :CurrentUser,
+    current_user :DepUser,
 ) -> ApiResp[Optional[UserLoginResp]]:
     """
     Update current user information.

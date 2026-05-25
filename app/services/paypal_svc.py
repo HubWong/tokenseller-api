@@ -1,3 +1,4 @@
+from app.core.abc_biz import logger
 import httpx
 from app.core.config import settings
 
@@ -12,17 +13,23 @@ class PayPalSvc:
         self.base_url = settings.PAYPAL_BASE_URL
 
     async def _get_token(self) -> str:
-        async with httpx.AsyncClient() as client:
-            resp = await client.post(
-                f"{self.base_url}{PAYPAL_TOKEN_URL}",
-                data={"grant_type": "client_credentials"},
-                auth=(self.client_id, self.client_secret),
-                headers={"Accept": "application/json"},
-            )
-            resp.raise_for_status()
-            return resp.json()["access_token"]
+        try:
+            async with httpx.AsyncClient() as client:
+                resp = await client.post(
+                    f"{self.base_url}{PAYPAL_TOKEN_URL}",
+                    data={"grant_type": "client_credentials"},
+                    auth=(self.client_id, self.client_secret),
+                    headers={"Accept": "application/json"},
+                )
+                resp.raise_for_status()
+                return resp.json()["access_token"]
+        except Exception as e:
+            logger.error("Failed to get PayPal token",str(e))
+            raise RuntimeError("PayPal authentication failed") from e
+            pass
+        
 
-    async def create_order(self, amount_usd: float, order_id: int, return_url: str, cancel_url: str) -> dict:
+    async def create_paypal_order(self, amount_usd: float, order_id: int, return_url: str, cancel_url: str) -> dict:
         token = await self._get_token()
         payload = {
             "intent": "CAPTURE",

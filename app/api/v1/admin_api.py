@@ -3,7 +3,7 @@ from app.features.user.schemas.photo_schema import  PhotoInDB
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
-from app.core.deps import AdminUser, get_db,CurrentUser, admin_required
+from app.core.deps import AdminUser, get_db,DepUser, admin_required
 from app.features.user.user_crud import get_console_datas, user_crud
 from app.features.user.photo_crud import photo_crud
 from app.features.db_base import ApiResp, PagedResp
@@ -73,7 +73,7 @@ async def update_user(
 @router.delete("/users/{user_id}", response_model=ApiResp)
 async def delete_user(
     *,
-    _: CurrentUser,
+    _: DepUser,
     db: AsyncSession = Depends(get_db),
     user_id: int
 ):
