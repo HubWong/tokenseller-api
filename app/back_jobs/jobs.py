@@ -4,6 +4,19 @@ from app.back_jobs.db_tasks import clean_expired_files_db
 from app.features.biz.order.price_repo import PriceRepo
 from app.features.biz.order.order_repo import OrderRepo
 import asyncio
+# 顶层统一运行异步任务的工具函数
+def run_async_task(coro):
+    """安全运行异步协程"""
+    try:
+        # 获取当前事件循环（如果存在）
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        # 没有则创建新的事件循环
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    
+    # 运行协程直到完成
+    return loop.run_until_complete(coro)
 
 async def run_clean():
     async with AsyncSessionLocal() as session:
@@ -15,11 +28,11 @@ async def run_remove_expired_orders():
         await order_repo.remove_expired_orders()
 
 def job_clean_expired_files():    
-    asyncio.run(run_clean())
+    run_async_task(run_clean())
     pass
 
 def job_remove_expired_orders():
-    asyncio.run(run_remove_expired_orders())
+    run_async_task(run_remove_expired_orders())
     
     pass
 

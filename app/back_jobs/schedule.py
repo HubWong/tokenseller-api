@@ -27,7 +27,12 @@ def start_scheduler():
     if scheduler:
         return scheduler  
 
-    scheduler = BackgroundScheduler()
+    scheduler = BackgroundScheduler(
+        job_defaults={
+            "coalesce": False,
+            "max_instances": 1,
+        }
+    )
     
     scheduler.add_job(
         job_clean_expired_files,
@@ -148,5 +153,5 @@ async def lifespanJob(app: FastAPI):
             with suppress(asyncio.CancelledError):
                 await app.state.tron_listener_task
 
-        await app.state.oneapi_svc.aclose()
+        await app.state.oneapi_svc.close()
         await loop.run_in_executor(executor, stop_scheduler)
