@@ -1,5 +1,5 @@
 from apscheduler.schedulers.background import BackgroundScheduler
-from app.back_jobs.jobs import job_clean_expired_files, job_gen_reports,get_model_pricing_cache
+from app.back_jobs.jobs import job_clean_expired_files,job_remove_expired_orders, job_gen_reports,get_model_pricing_cache
 from contextlib import asynccontextmanager, suppress
 from fastapi import FastAPI
 import asyncio
@@ -34,6 +34,14 @@ def start_scheduler():
         "interval",
         minutes=10,
         id="clean_files",
+        replace_existing=True
+    )
+
+    scheduler.add_job(
+        job_remove_expired_orders,
+        "interval",
+        minutes=30,
+        id="remove_expired_orders",
         replace_existing=True
     )
 

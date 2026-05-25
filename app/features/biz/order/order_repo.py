@@ -26,6 +26,22 @@ class OrderRepo():
             print(f"❌ 获取未完成订单失败: {e}")
             return []
 
+    async def remove_expired_orders(self) -> int:
+        try:
+            stmt = select(Order).where(Order.order_status == 'pending', Order.expired_at <= datetime.now())
+            result = await self.db.execute(stmt)
+            expired_orders = result.scalars().all()
+            count = len(expired_orders)
+            for order in expired_orders:
+                await self.db.delete(order)
+            await self.db.commit()
+            print(f"✅ 已删除 {count} 个过期订单")
+            return count
+        except Exception as e:
+            await self.db.rollback()
+            print(f"❌ 删除过期订单失败: {e}")
+            return 0
+
     # user recharge/buy token 
     async def pay_order(self, order_id: int, session: AsyncSession,
         status:Optional[OrderStatus]):

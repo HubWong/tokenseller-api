@@ -2,15 +2,25 @@ from datetime import datetime
 from app.core.database import AsyncSessionLocal
 from app.back_jobs.db_tasks import clean_expired_files_db
 from app.features.biz.order.price_repo import PriceRepo
-from app.core.deps import get_price_repo
+from app.features.biz.order.order_repo import OrderRepo
 import asyncio
 
 async def run_clean():
     async with AsyncSessionLocal() as session:
-        await clean_expired_files_db(session)
+        await clean_expired_files_db()
+
+async def run_remove_expired_orders():
+    async with AsyncSessionLocal() as session:
+        order_repo = OrderRepo(session)
+        await order_repo.remove_expired_orders()
 
 def job_clean_expired_files():    
     asyncio.run(run_clean())
+    pass
+
+def job_remove_expired_orders():
+    asyncio.run(run_remove_expired_orders())
+    
     pass
 
 

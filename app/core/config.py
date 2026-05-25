@@ -70,7 +70,7 @@ class Settings(BaseSettings):
     PAYPAL_CLIENT_ID: Optional[str] = os.getenv("PAYPAL_CLIENT_ID")
     PAYPAL_CLIENT_SECRET: Optional[str] = os.getenv("PAYPAL_CLIENT_SECRET")
     PAYPAL_MODE: str = os.getenv("PAYPAL_MODE", "sandbox")  # sandbox or live
-    PAYPAL_BASE_URL: str = "https://sandbox.paypal.com" if PAYPAL_MODE == "sandbox" else "https://sandbox.paypal.com"
+    PAYPAL_BASE_URL: str = "https://www.sandbox.paypal.com" if PAYPAL_MODE == "sandbox" else "https://www.sandbox.paypal.com"
     XPUB_tron:str = 'xpub6BsVPv5EsdwgcnkYP5DQ7xnY4tYn49ewY3aygAxpcYKRFa8JiGZpLNpm82pZXJUMJeddMQZXX4iYMjzoqyWSZvWrHBJmg7nPFXjQQ5xz6VL'
     PAYONEER_WEBHOOK_URL: str = os.getenv("PAYONEER_WEBHOOK_URL", "http://localhost:3001/api/payoneer/status")
     

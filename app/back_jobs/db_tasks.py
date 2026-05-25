@@ -5,7 +5,7 @@ from app.features.user.user_crud import user_crud
 from typing import Optional
 
 
-async def clean_expired_files_db(session: AsyncSession):
+async def clean_expired_files_db():
     print("[*] clean_expired_files_db executed at", datetime.now())
     pass
 
