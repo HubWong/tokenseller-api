@@ -88,13 +88,8 @@ async def paypal_success(
             logger.warning("PayPal order unexpected status %s: %s", token, paypal_order.get("status"))
             return RedirectResponse(url=f"{frontend_url}/app/billing?payment=error")
 
-        paid = await buy_svc.pay_order(order_id)
-        if paid:
-            await order_pool.remove_order(order_id)
-            await order_pool.publish_payment(order_id, {
-                "status": "confirmed",
-                "paypal_order_id": token,
-            })
+        await buy_svc.pay_order(order_id)
+       
 
         return RedirectResponse(url=f"{frontend_url}/app/billing?payment=success")
     except Exception:

@@ -26,6 +26,7 @@ class OrderPool:
         """Initialize redis connection, call during app/listener startup"""
         if self._redis is None:
             self._redis = await get_redis()
+        print('\n----> OrderPool Redis initialized')
 
     async def add_order(self, order:OrderInDBBase):
         order_id = getattr(order, 'id', None)
