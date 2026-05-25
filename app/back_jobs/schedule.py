@@ -1,5 +1,5 @@
 from apscheduler.schedulers.background import BackgroundScheduler
-from app.back_jobs.jobs import job_clean_expired_files, job_gen_reports
+from app.back_jobs.jobs import job_clean_expired_files, job_gen_reports,get_model_pricing_cache
 from contextlib import asynccontextmanager, suppress
 from fastapi import FastAPI
 import asyncio
@@ -115,7 +115,7 @@ async def lifespanJob(app: FastAPI):
     await seed_pricing_data()
     create_upload_dir()
     app.state.oneapi_svc = OneAPISvc()
-
+    app.state.model_price_cache = await get_model_pricing_cache() # 用于缓存模型定价数据，减少数据库查询
     # Initialize Redis connection for order_pool (shared with listener process)
     await order_pool.init_redis()
 

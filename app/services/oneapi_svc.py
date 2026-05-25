@@ -40,9 +40,16 @@ PRICE_INPUT = Decimal("0.002")
 PRICE_OUTPUT = Decimal("0.004")
 
 
-def resolve_model(tier: str) -> str:
-    models = MODEL_MAP.get(tier, MODEL_MAP["free"])
-    return models[0] if models else "deepseek-chat"
+def resolve_model(tier: str, model_price_cache: dict) -> List[str]:
+    switcher = {
+        "free": 1,
+        "cheap": 2,
+        "pro": 3
+        }
+    target_level = switcher.get(tier)
+    default_models = model_price_cache[0]["name"] 
+    models =[m["name"] for m in model_price_cache if m.get("level") == target_level] if target_level else []
+    return models if models else default_models
 
 
 # ================= 异步迭代器包装器 =================
@@ -326,7 +333,7 @@ class OneAPISvc:
 
         # 2. 模型与参数组装
         tier = key_data.tier
-        model = resolve_model(tier)
+        model = resolve_model(tier, request.app.state.model_price_cache)
         common_params = {
             "model": model,
             "messages": messages,

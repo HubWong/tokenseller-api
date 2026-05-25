@@ -18,29 +18,36 @@ class PriceRepo:
         model_name: str,
         input_cost: float,
         output_cost: float,
+        level: Optional[int] = 1,
         input_price: Optional[float] = None,
         output_price: Optional[float] = None,
         currency: str = "USD",
         is_active: bool = True
-    ) -> ModelPricing:
+    ) -> Optional[ModelPricing]:
         """Create a new model pricing record"""
         if input_price is None:
             input_price = round(input_cost * 1.5, 6)
         if output_price is None:
             output_price = round(output_cost * 1.5, 6)
-        pricing = ModelPricing(
-            model_name=model_name,
-            input_cost=input_cost,
-            output_cost=output_cost,
-            input_price=input_price,
-            output_price=output_price,
-            currency=currency,
-            is_active=1 if is_active else 0
-        )
-        self.db.add(pricing)
-        await self.db.commit()
-        await self.db.refresh(pricing)
-        return pricing
+        try:            
+            pricing = ModelPricing(
+                model_name=model_name,
+                input_cost=input_cost,
+                output_cost=output_cost,
+                input_price=input_price,
+                output_price=output_price,
+                currency=currency,
+                level=level,
+                is_active=1 if is_active else 0
+            )
+
+            self.db.add(pricing)
+            await self.db.commit()
+            await self.db.refresh(pricing)
+            return pricing
+        except Exception as e:
+            await self.db.rollback()
+            return None
 
     async def get_pricing_by_model(self, model_name: str) -> Optional[ModelPricing]:
         """Get pricing by model name"""
@@ -68,12 +75,12 @@ class PriceRepo:
             print('error rqst:',str(ex))
             return []
 
-    async def get_all_pricing(self, active_only: bool = True):
+    async def get_all_db_models(self, active_only: bool = True):
         """Get all pricing records"""
         query = select(ModelPricing)
         if active_only:
             query = query.where(ModelPricing.is_active == 1)
-        query = query.order_by(ModelPricing.model_name)
+        query = query.order_by(ModelPricing.model_name, ModelPricing.level.desc(),ModelPricing.created_at.desc())
         result = await self.db.execute(query)
         data = result.scalars().all()
         if not data:
@@ -85,10 +92,10 @@ class PriceRepo:
             result.append({
                 "name": item.model_name,
                 'id':item.id,
-                'input_cost':float(item.input_cost),
-                'output_cost':float(item.output_cost),
-                "input_price": float(item.input_price),
-                "output_price": float(item.output_price),
+                'input_cost':getattr(item,'input_cost',0),
+                'output_cost':getattr(item,'output_cost',0),
+                "input_price": getattr(item,'input_price',0),
+                "output_price": getattr(item,'output_price',0),
                 "currency": item.currency,
                 "level": item.level,
                 'is_active':item.is_active

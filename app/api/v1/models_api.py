@@ -19,7 +19,7 @@ async def get_all_models(
 ):
     """Get all model pricing records"""
     try:
-        models = await price_repo.get_all_pricing(active_only=active_only)
+        models = await price_repo.get_all_db_models(active_only=active_only)
         return ApiResp(success=True, data=models)
     except Exception as e:
         return ApiResp(success=False, message=str(e))
@@ -56,7 +56,8 @@ async def create_model(
             input_price=model_data.input_price,
             output_price=model_data.output_price,
             currency=model_data.currency,
-            is_active=model_data.is_active
+            is_active=model_data.is_active,
+            level=model_data.level
         )
         return ApiResp(success=True, data=ModelPricingResponse.model_validate(model))
     except Exception as e:

@@ -37,10 +37,11 @@ class PurchaseRequest(BaseModel):
 class ModelPricingUpdate(BaseModel):
     input_cost: Optional[float] = Field(None, gt=0, description="Input cost per 1K tokens")
     output_cost: Optional[float] = Field(None, gt=0, description="Output cost per 1K tokens")
-    input_price: Optional[float] = Field(None, gt=0, description="Input price per 1K tokens")
-    output_price: Optional[float] = Field(None, gt=0, description="Output price per 1K tokens")
+    input_price: Optional[float] = Field(None)
+    output_price: Optional[float] = Field(None)
     currency: Optional[str] = Field(None, description="Currency code")
     is_active: Optional[bool] = Field(None, description="Whether the model is active")
+    level: Optional[int] = Field(None, description="Model level for tiered pricing")
 
 # Request/Response Schemas
 class ModelPricingCreate(ModelPricingUpdate):
