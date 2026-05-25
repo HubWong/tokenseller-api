@@ -148,7 +148,7 @@ async def github_login(request: Request):
     if not settings.GITHUB_CLIENT_ID:
         raise HTTPException(status_code=503, detail="GitHub OAuth not configured")
     
-    redirect_uri = f"{settings.BACKEND_URL}/oauth/callback/github"
+    redirect_uri = f"{settings.API_URL}/oauth/callback/github"
     return await oauth.github.authorize_redirect(request, redirect_uri)
 
 

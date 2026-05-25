@@ -107,6 +107,7 @@ class Settings(BaseSettings):
     # OAUTH_REDIRECT_URL: str = os.getenv("OAUTH_REDIRECT_URL", "https://tokenmaker.ccwu.cc")
     # Backend URL for OAuth provider redirect_uri (OAuth providers redirect back here)
     BACKEND_URL: str = os.getenv("FRONTEND_URL", "https://tokenseller-api-production.up.railway.app")
+    API_URL: str = os.getenv("API_URL", "https://tokenseller-api-production.up.railway.app")
     BILL_PRICE_SET :list[float] = [10,25,50,100,200,500]
     RESEND_API_KEY: str = os.getenv("RESEND_API_KEY", "")
     
