@@ -54,6 +54,8 @@ class PriceRepo:
 
     async def get_pricing_by_model(self, model_name: str) -> Optional[ModelPricing]:
         """Get pricing by model name"""
+        if isinstance(model_name, list):
+            model_name = model_name[0]
         result = await self.db.execute(
             select(ModelPricing).where(ModelPricing.model_name == model_name)
         )

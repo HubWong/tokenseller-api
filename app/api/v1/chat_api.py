@@ -11,6 +11,7 @@ from app.core.deps import get_oneapi_svc,get_consume_svc, get_token_usage_rep
 from app.core.abc_biz import ConsumeService
 from app.services.tools_svc import check_api_reachable
 from app.core.deps import TransacDeps
+from app.core.config import settings
 
 router = APIRouter(prefix="/chat", tags=["AI chat gateway"])
 
@@ -25,7 +26,7 @@ async def chat_endpoint(
     consume_svc: ConsumeService = Depends(get_consume_svc),
     stream: bool = False  
 ):
-    is_open = check_api_reachable('one-api-production-73ea.up.railway.app/v1',6)
+    is_open = check_api_reachable(settings.ONEAPI_URL,6)
     if not is_open:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail = 'api can not be reached')
     return await oneSvc.chat_llm(db=db,
