@@ -8,13 +8,12 @@ from sqlalchemy import select
 from app.features.crud_base import CRUDBase
 from app.features.db_base import ApiResp
 from app.features.biz.apikey.apikey_model import ApiKey
-from app.features.biz.usage.model import TokenUsageLog
 from app.features.biz.apikey.apikey_schema import ApiKeyResp
 from app.core.security import gen_api_key
 import json
 from datetime import  datetime,timedelta
 
-from app.features.biz.usage.token_usage_repo import TokenUsageRepo
+from app.features.biz.user_balance.transaction_reop import TransactionRepo
 
 
 
@@ -44,7 +43,7 @@ class CRUDApiKey(CRUDBase[ApiKey, ApiKeyResp, ApiKeyResp]):
             print("error:", str(ex))
         return key   
      
-    async def auth_user(self,db: AsyncSession, request: Request,token_respo:TokenUsageRepo) -> ApiKey:
+    async def auth_user(self,db: AsyncSession, request: Request,balance_repo:TransactionRepo) -> ApiKey:
         auth = request.headers.get("Authorization")
         if not auth:
             raise HTTPException(401, "Missing API Key")
@@ -55,7 +54,8 @@ class CRUDApiKey(CRUDBase[ApiKey, ApiKeyResp, ApiKeyResp]):
         if user is None or uid is None:
             raise HTTPException(403, "Invalid API Key")        
         
-        _,_,_,left = await token_respo.get_request_log(uid=int(uid))
+        #_,_,_,left = await token_respo.get_request_log(uid=int(uid))
+        left = await balance_repo.query_transaction_sum(session=db, maker_id=uid)
         if left == 0:
             raise HTTPException(status_code=402,detail = "No token left")
         return user

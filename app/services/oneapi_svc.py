@@ -1,9 +1,11 @@
+from __future__ import annotations
+
 # 标准库
 import json
 import logging
 from decimal import Decimal
 from functools import lru_cache
-from typing import Any, Dict, List, Optional, Tuple, AsyncIterator
+from typing import Any, Dict, List, Optional, Tuple, AsyncIterator, TYPE_CHECKING
 import httpx
 import tiktoken
 from fastapi import Request, HTTPException
@@ -20,10 +22,12 @@ from starlette.requests import ClientDisconnect
 from app.core.config import settings
 
 # 项目内部模块
-from app.features.biz.usage.token_usage_repo import TokenUsageRepo
+if TYPE_CHECKING:
+    from app.core.deps import TransacDeps
 from app.features.biz.apikey.apikey_crud import apikey_crud
 from app.features.biz.apikey.apikey_schema import ApiKeyResp
 from app.core.abc_biz import ConsumeService
+from app.features.biz.usage.token_usage_repo import TokenUsageRepo
 
 logger = logging.getLogger(__name__)
 
@@ -43,9 +47,9 @@ def resolve_model(tier: str, model_price_cache: dict) -> List[str]:
         "pro": 3
         }
     target_level = switcher.get(tier)
-    default_models = model_price_cache[0]["name"] 
+    default_models = model_price_cache[0]["name"]
     models =[m["name"] for m in model_price_cache if m.get("level") == target_level] if target_level else []
-    return models if models else default_models
+    return models if models else [default_models]
 
 
 # ================= 异步迭代器包装器 =================
@@ -349,12 +353,13 @@ class OneAPISvc:
         request: Request,
         consume_svc: ConsumeService,
         db: AsyncSession,
+        trans_repo: TransacDeps,
         token_repo: TokenUsageRepo,
         stream: bool,
     ):
         """核心聊天接口：结构优化、异常安全、日志增强"""
         # 1. 认证与参数解析
-        rst = await apikey_crud.auth_user(db=db, request=request, token_respo=token_repo)
+        rst = await apikey_crud.auth_user(db=db, request=request, balance_repo=trans_repo)
         
         if rst is None:
             raise HTTPException(status_code=403,detail = "Invalid API Key")
@@ -371,7 +376,7 @@ class OneAPISvc:
         tier = key_data.tier
         model = resolve_model(tier, request.app.state.model_price_cache)
         common_params = {
-            "model": model,
+            "model": model[0],
             "messages": messages,
             "temperature": 0.7,
             "stream": stream,

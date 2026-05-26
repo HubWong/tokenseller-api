@@ -8,7 +8,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from typing import Optional,Annotated
 from app.core.security import verify_token,get_subject_from_token
-from app.core.config import settings
 from app.core.database import  get_db_manual,get_db
 from app.features.user.model.user_model import User, UserRole
 from app.features.user.schemas.user_schema import UserInDbWithPwd,UserLoginResp
@@ -66,7 +65,7 @@ async def get_token_usage_rep(db:AsyncSession= Depends(get_db_manual)):
 async def get_transaction_rep(db:AsyncSession= Depends(get_db_manual)):
     return TransactionRepo(db=db)
  
-
+TransacDeps = Annotated[TransactionRepo, Depends(get_transaction_rep)]
 
 async def get_base_svc(transc_rep:TransactionRepo = Depends(get_transaction_rep)) -> BaseService:  
     return BaseService(transc_rep=transc_rep, redis_client=None)
