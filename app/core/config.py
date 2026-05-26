@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "token_seller"
     APP_ENV: str = APP_ENV
     VERSION: str = "1.0.0"
-    API_V1_STR: str = "/api/v1"
+    API_V1_STR: str = ""
     BASE_DIR: str = os.path.dirname(os.path.abspath(__file__))
     FREE_TOKENS: int = 100000
     FREE_AMOUNT: float = 10.0

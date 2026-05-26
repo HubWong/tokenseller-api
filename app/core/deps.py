@@ -29,7 +29,7 @@ from app.services.redis_svc import get_redis
 logger = logging.getLogger(__name__)
 
 oauth2_scheme = OAuth2PasswordBearer(
-    tokenUrl=f"{settings.API_V1_STR}/auth/login"
+    tokenUrl=f"/auth/login"
 )
 
 async def get_user_crud():
