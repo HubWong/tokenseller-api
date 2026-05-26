@@ -1,4 +1,5 @@
 from pydantic_settings import BaseSettings
+from pydantic import Field
 from typing import Optional
 import os
 from dotenv import load_dotenv
@@ -57,10 +58,9 @@ class Settings(BaseSettings):
         "SQL_DB_URL_Sync",  f"sqlite:///{os.path.join(PROJECT_ROOT, 'tokens.db')}"
     )
    
-    REDIS_URL: str = (
-        os.getenv("APP_REDIS_URL")
-        or (lambda u: u if u and "localhost" not in u else None)(os.getenv("REDIS_URL"))
-        or "redis://default:HYWOrzxxIaMSwuymHbIKQbTnmovFTFF@shinkansen.proxy.rlwy.net:31115"
+    REDIS_URL: str = Field(
+        default="redis://default:HYWOrzxxIaMSwuymHbICKQbTnmovFTFF@shinkansen.proxy.rlwy.net:31115",
+        validation_alias="APP_REDIS_URL",
     )
 
     REDIS_POOL_SIZE: int = int(os.getenv("REDIS_POOL_SIZE", 20))
