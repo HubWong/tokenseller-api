@@ -19,7 +19,7 @@ class User(Base, TimestampMixin):
     email = Column(String(255), unique=True, index=True, nullable=False)
     username = Column(String(50), default="",nullable=True)
     hashed_password = Column(String(255), nullable=True)       
-    role = Column(Enum(UserRole), default=UserRole.USER)
+    role = Column(String(15), default=UserRole.USER.value)
     is_active = Column(Boolean, default=True)    
     reset_pwd_token = Column(String(200), nullable=True)  # reset password token
     pc_id = Column(String(200), nullable=True,index=True)  # device pc id

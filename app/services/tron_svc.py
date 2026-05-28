@@ -1,5 +1,5 @@
 
-from app.core.abc import BaseChainListener
+from app.core.abc.abc import BaseChainListener
 from dotenv import load_dotenv
 from sqlmodel import SQLModel
 from typing import Optional, Dict

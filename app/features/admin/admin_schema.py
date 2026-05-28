@@ -14,7 +14,8 @@ class AdminConsoleData(BaseModel):
     role_user_count: int
     
 
-class AdminUserUpdate(BaseModel):   
+class AdminUserUpdate(BaseModel):  
+    uid:int  
     is_active: Optional[bool] = None
     role: Optional[str] = None
 

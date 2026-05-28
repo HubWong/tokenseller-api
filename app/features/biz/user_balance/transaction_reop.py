@@ -1,3 +1,4 @@
+import decimal
 from typing import Optional, Sequence, Dict
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import func, select
@@ -37,7 +38,7 @@ class TransactionRepo:
         self,
         session: AsyncSession,
         maker_id: int,
-        amount: float,
+        amount: decimal.Decimal,
         transaction_type: TransactionType,
         meta: Optional[Dict[str, str]] = None
     ):

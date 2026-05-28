@@ -3,20 +3,11 @@ from typing import  Optional
 from decimal import ROUND_DOWN
 from app.features.user.schemas.user_role import UserRole
 from app.features.biz.order.order_schema import ModelPricingResponse
-
+from app.services.oneapi.model_choose import SAAS_TIERS
 
 PRICE_UNIT = Decimal("1000000")
 PRECISION = Decimal("0.000001")
 
-
-
-
-user_multiplier = {
-  "free"    : 1.5,
-  "vip"     : 1.0,
-  "reseller": 0.8,
-  'admin'   : 1.0
-}
 
 
 
@@ -33,7 +24,9 @@ def get_role_multiplier(role: UserRole) -> float:
     # 获取角色的字符串值
     role_value = role.value
     # 从字典中获取倍率，不存在则返回默认值 1.0
-    return user_multiplier.get(role_value, 1.0)
+    disct = SAAS_TIERS.get(role_value,{})
+
+    return disct.get("discount", 1.0)
 
 class TokenCostCalculator:
     def __init__(self,price_db):       

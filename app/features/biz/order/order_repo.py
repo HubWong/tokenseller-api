@@ -44,7 +44,7 @@ class OrderRepo():
 
     # user recharge/buy token 
     async def pay_order(self, order_id: int, session: AsyncSession,
-        status:Optional[OrderStatus]):
+        status:Optional[OrderStatus])->Optional[Order]:
         try:
             order = select(Order).where(Order.id == order_id)
             result = await session.execute(order)
@@ -101,7 +101,8 @@ class OrderRepo():
         
         return [OrderInDBBase.model_validate(obj) for obj in db_objs], total
     
-   
+    async def update_status(self,order_id:int,status:str):
+        pass
 
     async def get_by_id(self,  order_id: int) -> Optional[OrderCreateIn]:
         stmt = select(Order).where(Order.id == order_id)

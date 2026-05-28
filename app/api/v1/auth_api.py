@@ -1,7 +1,6 @@
 from datetime import datetime,timezone
 from typing import Any,Optional
 from fastapi import APIRouter, Body, Depends,  status
-from sqlalchemy.ext.asyncio import AsyncSession
 from app.features.db_base import ApiResp
 from app.core.security import (
     create_access_token,
@@ -9,11 +8,9 @@ from app.core.security import (
     verify_password,    
     get_subject_from_token
 )
-from app.core.deps import get_db
-from app.socket.manager import manager
-
-from app.features.user.user_crud import user_crud
-from app.core.deps import DepUser, get_current_user_with_pwd, get_oneapi_svc, get_transaction_rep
+from app.core.deps import DbSessionDeps,get_transaction_rep,UserRepoDeps
+from app.core.deps_svc import get_oneapi_svc
+from app.core.deps_auth import get_current_user_with_pwd,DepUser
 from app.features.user.photo_crud import photo_crud
 from app.features.user.schemas.token_schema import (
     PasswordResetRequest,
@@ -25,9 +22,8 @@ from app.features.user.schemas.token_schema import (
 from app.features.user.schemas.user_schema import UserLoginResp,UpdateUsername, UserCreate, UserInDB,UserCvUpdate,UserAvatarOut
 from app.core.security import CustomOAuth2Form
 from app.features.user.token_crud import token_crud
-from app.features.biz.usage.token_usage_repo import TokenUsageRepo
 from app.features.biz.user_balance.transaction_reop import TransactionRepo
-from app.services.oneapi_svc import OneAPISvc
+from app.services.oneapi_svc import OneApiSvc
 
 router = APIRouter(prefix="/auth", tags=["authentication"])
 
@@ -35,8 +31,9 @@ router = APIRouter(prefix="/auth", tags=["authentication"])
 async def register(
     *,
     user_in: UserCreate,
-    db: AsyncSession = Depends(get_db),    
-    one_api_svc:OneAPISvc= Depends(get_oneapi_svc),
+    db: DbSessionDeps,    
+    user_crud:UserRepoDeps,
+    one_api_svc:OneApiSvc= Depends(get_oneapi_svc),
     transaction_repo :TransactionRepo= Depends(get_transaction_rep)
 ) :
     """
@@ -49,7 +46,8 @@ async def register(
 
 @router.post("/login", response_model=ApiResp[Optional[TokenSchemaUser]])
 async def login(
-    db: AsyncSession = Depends(get_db),
+    db: DbSessionDeps,
+    user_crud:UserRepoDeps,
     form_data: CustomOAuth2Form = Depends()
 ) -> ApiResp[Optional[TokenSchemaUser]]:
     """
@@ -66,7 +64,8 @@ async def login(
 
 @router.post("/refresh-token", response_model=ApiResp[Optional[TokenSchema]])
 async def refresh_token(
-    db: AsyncSession = Depends(get_db),
+    db: DbSessionDeps,
+    user_crud:UserRepoDeps,
     refresh_token: str = Body(...),
 ):
     """
@@ -76,7 +75,7 @@ async def refresh_token(
     if not user_id:
         return ApiResp(success=False,message="Invalid refresh token",data=None)
     
-    user =await user_crud.get(db, id=int(user_id))
+    user =await user_crud.get_by_id(db, id=int(user_id))
     if not user:
         return ApiResp(success=False,message="User not found",data=None)
     elif not getattr(user, "is_active", True):
@@ -94,7 +93,8 @@ async def refresh_token(
 
 @router.post("/request-password-reset", status_code=status.HTTP_200_OK)
 async def request_password_reset(
-    req: PasswordResetRequest, db: AsyncSession = Depends(get_db)
+    user_crud:UserRepoDeps,
+    req: PasswordResetRequest, db: DbSessionDeps
 ) -> ApiResp:
     """
     请求密码重置 ,by send email
@@ -110,8 +110,9 @@ async def request_password_reset(
 
 
 @router.post("/newpwd",response_model=ApiResp)
-async def change_password(password_data: PasswordChange,    
-                          db: AsyncSession = Depends(get_db),
+async def change_password(password_data: PasswordChange, 
+                          user_crud:UserRepoDeps,   
+                          db: DbSessionDeps,
                           current_user = Depends(get_current_user_with_pwd)): 
     if not verify_password(password_data.old_password, str(current_user.hashed_password)):
         return ApiResp(success=False,message="旧密码不正确",data=None)    
@@ -121,8 +122,8 @@ async def change_password(password_data: PasswordChange,
 
 @router.post("/pwd_lost_reset")
 async def pwd_lost_reset(
-    *,
-    db: AsyncSession = Depends(get_db),    
+    user_crud:UserRepoDeps,
+    db: DbSessionDeps,    
     lostPwdReset: LostPasswordReset,
 ) -> Any:
     """
@@ -136,20 +137,19 @@ async def pwd_lost_reset(
 @router.post('/logout', response_model=ApiResp[Optional[bool]])
 async def logout(
     current_user:DepUser,
-    db: AsyncSession = Depends(get_db),
+    db: DbSessionDeps,
 
 ) -> ApiResp[Optional[bool]]:
     """
     Logout user by deleting the refresh token.
     """    
     userId = current_user.id
-    await manager.logout_user(uid=int(str(userId)))                       
     return await token_crud.logout_delete_token(db, uid=userId)
 
 @router.get("/me")
 def get_my_profile(
     current_user: DepUser,
-) -> ApiResp[Optional[UserInDB]]:
+) -> ApiResp:
     """
     Get current user information.
     """   
@@ -158,23 +158,23 @@ def get_my_profile(
 
 
 @router.put('/update_username/{id}')
-async def update_user(id:int,username:UpdateUsername,db:AsyncSession=Depends(get_db)):
+async def update_user(id:int,username:UpdateUsername, user_crud:UserRepoDeps, db:DbSessionDeps):
     return await user_crud.update_username(db=db,uid=id, username=username.username)
 
 @router.get("/my_avatar")
 async def get_current_user_avatar(
     *,
-    db: AsyncSession = Depends(get_db),
-    current_DepUser,
+    db: DbSessionDeps,
+    current:DepUser,
 ) -> ApiResp[Optional[str]]:
-    return await photo_crud.get_avatar_base64(db=db, user=current_user)
+    return await photo_crud.get_avatar_base64(db=db, user=current)
 
 @router.put('/me_avatar') #update user avatar only
 async def update_current_user_avatar(
     *,
-    db: AsyncSession = Depends(get_db),
+    db: DbSessionDeps,
+    current_user:DepUser,
     avatar_url: str = Body(..., embed=True),
-    current_DepUser,
 ) -> ApiResp[Any]:
     """
     Update current user's avatar.
@@ -188,8 +188,9 @@ async def update_current_user_avatar(
 @router.put("/me") #update user without avatar ,avatar moves to another api of photo 
 async def update_profile(
     *,
-    db: AsyncSession = Depends(get_db),
-    user_in: UserCvUpdate,    
+    db: DbSessionDeps,
+    user_in: UserCvUpdate,  
+    user_crud:UserRepoDeps,  
     current_user :DepUser,
 ) -> ApiResp[Optional[UserLoginResp]]:
     """

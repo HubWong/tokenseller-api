@@ -6,8 +6,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import SQLAlchemyError 
 import redis.asyncio as redis
 from decimal import Decimal
-from app.core.abc import BuyServiceABC, CommissionServiceABC, ConsumeServiceABC, BaseServiceABC
+from app.core.abc.abc import BuyServiceABC, CommissionServiceABC, ConsumeServiceABC
 from app.core.database import get_db, to_dict, get_db_manual
+from app.features.biz.user_balance.transaction_reop import TransactionRepo
+from app.features.biz.order.order_model import ModelPricing
 from app.features.biz.order.order_repo import OrderRepo
 from app.features.biz.order.order_schema import PurchaseRequest, OrderStatus
 from app.features.biz.user_balance.models import Transaction, TransactionType
@@ -17,14 +19,15 @@ from app.features.user.model.user_model import User
 from app.features.biz.apikey.apikey_schema import ApiKeyResp
 from app.services.token_money_svc import TokenCostCalculator
 from app.features.user.schemas.user_role import UserRole
-
+from app.features.biz.apikey.apikey_crud import apikey_crud
 
 logger = logging.getLogger(__name__)
 MIN_BUY_AMOUNT = Decimal("0.0005")
 
-class BaseService(BaseServiceABC):
-    def __init__(self, transc_rep, redis_client: redis.Redis):
-        self.transaction = transc_rep
+class BaseService:
+    def __init__(self, db: AsyncSession, redis_client: Optional[redis.Redis]):
+        self.transaction = TransactionRepo(db)
+        self.db = db
         self.redis_client = redis_client
 
     async def add_transaction(self, db: AsyncSession, memo: str, user_id: int, amount: float, transaction_type: TransactionType):
@@ -34,13 +37,12 @@ class BaseService(BaseServiceABC):
         await db.refresh(trans)
         return trans
 
-    async def update_user(self, user_id: int, amount: float, db: AsyncSession = None):
+    async def update_user(self, user_id: int,amount: float):
         # 修复：增加空值判断
-        if not db:
-            raise ValueError("AsyncSession cannot be None")
+       
         try:
-            stmt = update(User).where(User.id == user_id).values(balance=User.balance + amount)
-            await db.execute(stmt)
+            stmt = update(User).where(User.id == user_id).values(balance=User.balance + amount,role=UserRole.VIP.value)
+            await self.db .execute(stmt)
             
         except SQLAlchemyError as e:
             logger.error(f"Failed to update user {user_id} balance: {str(e)}", exc_info=True)
@@ -53,8 +55,9 @@ class BuyService(BaseService, BuyServiceABC):
     def __init__(self, base: BaseService, 
             order_repo: OrderRepo, 
             token_repo: TokenUsageRepo, 
-            token_cal_svc: TokenCostCalculator):
-        super().__init__(base.transaction, base.redis_client)
+            token_cal_svc: TokenCostCalculator
+            ):
+        super().__init__(db = base.db, redis_client = base.redis_client)
         self.order_repo = order_repo
         self.token_cal_svc = token_cal_svc
         self.token_usage_repo = token_repo
@@ -70,12 +73,11 @@ class BuyService(BaseService, BuyServiceABC):
                     return False
                 #update user role if needed 
                 
-                await self.update_user(user_id=order.user_id, amount=order.amount, db=session)
-
+                await self.update_user(user_id=getattr(order, "user_id"), amount=getattr(order, "amount"))
+                await apikey_crud.update_tier_by_id_cmmition(uid=getattr(order, "user_id"), tier=UserRole.VIP.value, db=session)
                 meta = to_dict(order)
-                # 修复：统一使用 session 事务
-                await self.transaction.consume_session(session=session, maker_id=0, amount=order.amount, transaction_type=TransactionType.SYSINCOME, meta=meta)
-                await self.transaction.consume_session(session=session, maker_id=order.user_id, amount=order.amount, transaction_type=TransactionType.RECHARGE, meta=meta)
+                await self.transaction.consume_session(session=session, maker_id=0, amount=getattr(order, "amount"), transaction_type=TransactionType.SYSINCOME, meta=meta)
+                await self.transaction.consume_session(session=session, maker_id=getattr(order,'user_id'), amount=getattr(order, "amount"), transaction_type=TransactionType.RECHARGE, meta=meta)
                  
 
                 await session.commit()
@@ -93,17 +95,16 @@ class BuyService(BaseService, BuyServiceABC):
 class ConsumeService(BaseService, ConsumeServiceABC):
     # 修复：类型注解
     def __init__(self, base: BaseService, commission_service: CommissionServiceABC, price_calc: TokenCostCalculator):
-        super().__init__(base.transaction, base.redis_client)
+        super().__init__(db=base.db,redis_client = base.redis_client)
         self.commission = commission_service
         self.calcu = price_calc
 
-    async def charge(self, user_data: ApiKeyResp, usage: dict, token_usage: TokenUsageLog, request_model: str, session: AsyncSession):
+    async def charge(self,model_price:ModelPricing, user_data: ApiKeyResp, usage: dict, token_usage: TokenUsageLog, request_model: str, session: AsyncSession):
         # 1. 获取 token 数量
         inp_tk = usage.get('prompt_tokens', 0)
         outp_tk = usage.get('completion_tokens', 0)
 
         # 2. 查询模型价格（不存在直接抛错）
-        model_price = await self.calcu.query_price_table(request_model)
         if model_price is None:
             logger.warning(f"Model {request_model} not found in price table")
             raise Exception(f"Model {request_model} not found in price table")
@@ -131,17 +132,17 @@ class ConsumeService(BaseService, ConsumeServiceABC):
         # ===================== 修复 3：最低消费金额 =====================
         if sale_price < MIN_BUY_AMOUNT_DEC:
             sale_price = MIN_BUY_AMOUNT_DEC
-
+        mmo_str = f'api request:{str(usage)}, user type: {user_data.tier}'
         # ===================== 修复 4：更新 token 日志 =====================
-        token_usage.status = 'completed'
+        setattr(token_usage,'status','completed')
         token_usage.updated_at = datetime.now()
-        token_usage.memo = f'api request:{str(usage)}, user type: {user_data.tier}'
+        setattr(token_usage,'memo',mmo_str)
         token_usage.input_tokens = inp_tk
         token_usage.output_tokens = outp_tk
         token_usage.amount = inp_tk + outp_tk
-        token_usage.provider_cost = cost
-        token_usage.sale_price = sale_price
-        token_usage.profit = sale_price - cost  # 利润自动正确
+        setattr(token_usage,'provider_cost',cost)
+        setattr(token_usage,'sale_price',sale_price)
+        setattr(token_usage,'profit',sale_price - cost)
 
         # 元数据
         meta = {"model": request_model, "usage": usage}
@@ -171,9 +172,9 @@ class ConsumeService(BaseService, ConsumeServiceABC):
                 # 必须在同一事务内
                 await self.commission.distribute(
                     from_user=user_data.user_id,
-                    amount=profit,
+                    amount=float(profit),
                     usage_id=token_usage.id,
-                    session=session
+                    session=session,
                 )
 
             # 统一提交
@@ -197,7 +198,7 @@ class ConsumeService(BaseService, ConsumeServiceABC):
 
 class CommissionService(BaseService, CommissionServiceABC):
     def __init__(self, user_repo, base: BaseService):
-        super().__init__(base.transaction, base.redis_client)
+        super().__init__(db=base.db, redis_client =base.redis_client)
         self.user_repo = user_repo
 
     async def distribute(self, from_user: int, 

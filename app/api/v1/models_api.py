@@ -2,9 +2,11 @@
 from typing import List
 from fastapi import APIRouter, Depends
 from app.features.biz.order.order_schema import ModelPricingCreate, ModelPricingResponse, ModelPricingUpdate
-from app.core.deps import get_price_repo, admin_required
+from app.core.deps import get_price_repo
+from app.core.deps_auth import admin_required
 from app.features.biz.order.price_repo import PriceRepo
 from app.features.db_base import ApiResp
+
 
 router = APIRouter(prefix="/models", tags=["models"])
 

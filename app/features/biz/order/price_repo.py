@@ -1,4 +1,3 @@
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import Update, select, update, delete
 from typing import Any, Optional, List
 from app.features.biz.order.order_model import ModelPricing
@@ -10,7 +9,7 @@ from app.services.tools_svc import check_api_reachable
 
 
 class PriceRepo:
-    def __init__(self, db: AsyncSession):
+    def __init__(self, db):
         self.db = db
 
     async def create_model(
@@ -79,15 +78,19 @@ class PriceRepo:
         except Exception as ex:
             print('error rqst:',str(ex))
             return []
-
-    async def get_all_db_models(self, active_only: bool = True):
+        
+    async def get_all_modelpricings(self, active_only: bool = True)-> Optional[List[ModelPricing]]:
         """Get all pricing records"""
         query = select(ModelPricing)
         if active_only:
             query = query.where(ModelPricing.is_active == 1)
         query = query.order_by(ModelPricing.model_name, ModelPricing.level.desc(),ModelPricing.created_at.desc())
         result = await self.db.execute(query)
-        data = result.scalars().all()
+        data = result.scalars().all()   
+        return data
+    
+    async def get_all_db_models(self, active_only: bool = True)-> List[dict[str,str]]:
+        data =await self.get_all_modelpricings(active_only=active_only)
         if not data:
            return []
         result =[]
@@ -252,6 +255,8 @@ class PriceRepo:
             if not existing:
                 await self.create_model(
                     model_name=model_name,
+                    input_cost=float(price_data["input"]),
+                    output_cost=float(price_data["output"]),
                     input_price=float(price_data["input"]),
                     output_price=float(price_data["output"]),
                     currency="USD",
@@ -260,3 +265,4 @@ class PriceRepo:
                 created_count += 1
 
         return created_count
+

@@ -1,15 +1,15 @@
 
+from app.features.admin.admin_schema import AdminUserUpdate
 from app.features.user.schemas.photo_schema import  PhotoInDB
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
-from app.core.deps import AdminUser, get_db,DepUser, admin_required
-from app.features.user.user_crud import get_console_datas, user_crud
+from app.core.deps import DbSessionDeps, OrderRepoDeps,UserRepoDeps
+from app.core.deps_auth import AdminUser, DepUser, admin_required
+from app.features.user.user_crud import get_console_datas
 from app.features.user.photo_crud import photo_crud
 from app.features.db_base import ApiResp, PagedResp
 from app.features.biz.order.order_schema import OrderStatus
 from app.features.user.model.user_model import User
-from app.features.admin.admin_schema import AdminUserUpdate
 from app.features.user.schemas.user_schema import UserInDB, UserForAdmin
 
 
@@ -19,7 +19,7 @@ router = APIRouter(prefix="/admin", tags=["admin"])
 @router.get("/dashboard", response_model=ApiResp)
 async def get_dashboard_stats(
     *,
-    db: AsyncSession = Depends(get_db),
+    db: DbSessionDeps,
     _: AdminUser
 ):
     """获取仪表盘用户统计数据"""
@@ -31,7 +31,8 @@ async def get_dashboard_stats(
 
 @router.get("/users/{page}", response_model=PagedResp[List[UserForAdmin]])
 async def read_users(
-    db: AsyncSession = Depends(get_db),
+    user_crud: UserRepoDeps,
+    db: DbSessionDeps,
     page: int = 1,
     size: int = 10,
     sort_by: str = Query("id", pattern="^(id|name|created_at)$"),
@@ -56,13 +57,13 @@ async def read_users(
 
 @router.put("/user/{user_id}/deactive", response_model=ApiResp[UserForAdmin])
 async def update_user(
-    *,
-    db: AsyncSession = Depends(get_db),
+    db: DbSessionDeps,
+    user_in:AdminUserUpdate  ,
     _: AdminUser,
-    user_id: int,    
+    user_crud: UserRepoDeps
 ):
     """更新用户信息"""
-    user =await user_crud.get(db, id=user_id)
+    user =await user_crud.get_by_id(db, id=getattr(user_in, "id"))
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     user = await user_crud.admin_update_user(db, db_obj=user, obj_in=user_in)
@@ -72,16 +73,16 @@ async def update_user(
 
 @router.delete("/users/{user_id}", response_model=ApiResp)
 async def delete_user(
-    *,
     _: DepUser,
-    db: AsyncSession = Depends(get_db),
-    user_id: int
+    db: DbSessionDeps,
+    user_id: int,
+    user_crud: UserRepoDeps
 ):
     """删除用户"""
-    user = user_crud.get(db, id=user_id)
+    user = user_crud.get_by_id(db, id=user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    await user_crud.delete(db, id=user_id)
+    await user_crud.remove(db, id=user_id)
     return ApiResp(success=True, message="User deleted successfully")
 
 # 支付管理
@@ -89,17 +90,18 @@ async def delete_user(
 @router.put("/payments/{payment_id}/status", response_model=ApiResp)
 async def update_payment_status(
     *,
-    db: AsyncSession = Depends(get_db),
+    db: DbSessionDeps,
+    payment_crud:OrderRepoDeps,
     _: User = Depends(admin_required),
     payment_id: int,
     status: OrderStatus
 ):
     """更新支付状态"""
-    Order = await payment_crud.get(db, id=payment_id)
+    Order = await payment_crud.get_by_id(order_id=payment_id)
     if not Order:
         raise HTTPException(status_code=404, detail="Order not found")
 
-    Order = await payment_crud.update(db, db_obj=Order, obj_in={"status": status})
+    Order = await payment_crud.update_status(order_id=payment_id, status=status)
     return ApiResp(success=True, data=Order)
 
 # 照片管理
@@ -108,7 +110,7 @@ async def update_payment_status(
 @router.get("/photos/{pg}", response_model=ApiResp[Optional[List[PhotoInDB]]])
 async def get_photos(
     *,
-    db: AsyncSession = Depends(get_db),
+    db: DbSessionDeps,
     _: User = Depends(admin_required),
     pg: int = 1,
 
@@ -125,7 +127,7 @@ async def get_photos(
 @router.delete("/photos/{photo_id}", response_model=ApiResp)
 async def delete_photo(
     *,
-    db: AsyncSession = Depends(get_db),
+    db: DbSessionDeps,
     _: User = Depends(admin_required),
     photo_id: int
 ):

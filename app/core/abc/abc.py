@@ -1,7 +1,6 @@
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Tuple
-
-from app.features.db_base import ApiResp
+from typing import Dict, Any, Optional, Tuple
+from sqlalchemy.ext.asyncio import AsyncSession
 
 class BaseServiceABC(ABC):
     """基础服务抽象类
@@ -56,7 +55,8 @@ class ConsumeServiceABC(BaseServiceABC):
     UserBalance(-1)
     '''
     @abstractmethod
-    async def charge(self,charge_type:str, user_id: int, model: str, usage: dict, meta: dict = None):
+    async def charge(self,charge_type:str, user_id: int, model: str, 
+                     usage: dict, meta: Optional[dict] = None):
         pass
  
 class CommissionServiceABC(BaseServiceABC):
@@ -73,7 +73,10 @@ class CommissionServiceABC(BaseServiceABC):
         CommissionLog
     '''
     @abstractmethod
-    async def distribute(self, order_id: int, from_uid: int, amount: float):
+    async def distribute(self, from_user: int, 
+                         amount: float, 
+                         usage_id=None, 
+                         session: Optional[AsyncSession] = None):
         pass
     
 
@@ -87,7 +90,7 @@ class RedisListenerABC(ABC):
         ...
     
     @abstractmethod
-    async def callback(data:dict):
+    async def callback(data:Any,type:Optional[str]):
         pass
 
 class AddressPoolABC(ABC):

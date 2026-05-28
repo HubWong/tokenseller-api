@@ -1,5 +1,5 @@
 from redis.asyncio import Redis
-from app.core.abc import AddressPoolABC
+from app.core.abc.abc import AddressPoolABC
 from sqlalchemy.ext.asyncio import AsyncSession
 from bip_utils import Bip44Coins,Bip84Coins,Bip84,Bip44Changes,Bip44
 

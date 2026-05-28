@@ -1,16 +1,11 @@
-from __future__ import annotations
-
 # 标准库
 import json
 import logging
 from decimal import Decimal
 from functools import lru_cache
-from typing import Any, Dict, List, Optional, Tuple, AsyncIterator, TYPE_CHECKING
+from typing import Any, Dict, List, Optional,  Tuple, AsyncIterator
 import httpx
-import tiktoken
-from fastapi import Request, HTTPException
-from fastapi.responses import StreamingResponse
-from sqlalchemy.ext.asyncio import AsyncSession
+from app.services.oneapi.token_usage_proc import UsageTracker
 from tenacity import (
     retry,
     stop_after_attempt,
@@ -18,17 +13,7 @@ from tenacity import (
     retry_if_exception_type,
 )
 
-from starlette.requests import ClientDisconnect
 from app.core.config import settings
-
-# 项目内部模块
-if TYPE_CHECKING:
-    from app.core.deps import TransacDeps
-from app.features.biz.apikey.apikey_crud import apikey_crud
-from app.features.biz.apikey.apikey_schema import ApiKeyResp
-from app.core.abc_biz import ConsumeService
-from app.features.biz.usage.token_usage_repo import TokenUsageRepo
-
 logger = logging.getLogger(__name__)
 
 # 从配置读取主密钥，避免硬编码
@@ -37,19 +22,6 @@ create_userapi = f"{settings.ONEAPI_URL}/api/user"
 
 PRICE_INPUT = Decimal("0.002")
 PRICE_OUTPUT = Decimal("0.004")
-
-
-
-def resolve_model(tier: str, model_price_cache: dict) -> List[str]:
-    switcher = {
-        "free": 1,
-        "cheap": 2,
-        "pro": 3
-        }
-    target_level = switcher.get(tier)
-    default_models = model_price_cache[0]["name"]
-    models =[m["name"] for m in model_price_cache if m.get("level") == target_level] if target_level else []
-    return models if models else [default_models]
 
 
 # ================= 异步迭代器包装器 =================
@@ -64,49 +36,6 @@ class StreamIterator:
     def __aiter__(self) -> AsyncIterator[dict]:
         return self._gen
 
-
-# ================= Token 统计器 =================
-class UsageTracker:
-    def __init__(self, messages: Optional[List[dict]] = None, model: str = "gpt-3.5-turbo"):
-        self.messages = messages or []
-        self.model = model
-        self.usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
-        self.has_real_usage = False
-
-    def update_from_chunk(self, chunk: dict):
-        if isinstance(chunk, dict):
-            usage = chunk.get("usage")
-            if usage:
-                self.usage.update({
-                    "prompt_tokens": usage.get("prompt_tokens", 0),
-                    "completion_tokens": usage.get("completion_tokens", 0),
-                    "total_tokens": usage.get("total_tokens", 0),
-                })
-                self.has_real_usage = True
-
-    def finalize(self, full_text: str = "") -> Dict[str, int]:
-        if self.has_real_usage:
-            return self.usage
-
-        try:
-            enc = tiktoken.encoding_for_model(self.model)
-        except Exception:
-            enc = tiktoken.get_encoding("cl100k_base")  # 安全 fallback
-
-        prompt_tokens = sum(len(enc.encode(msg.get("content", ""))) for msg in self.messages)
-        completion_tokens = len(enc.encode(full_text)) if full_text else 0
-
-        self.usage = {
-            "prompt_tokens": prompt_tokens,
-            "completion_tokens": completion_tokens,
-            "total_tokens": prompt_tokens + completion_tokens,
-        }
-        return self.usage
-
-
-json_lib = json  # 与原代码保持一致
-
-
 # 自定义异常（建议统一管理）
 class OneAPIError(Exception):
     """基础 OneAPI 异常"""
@@ -116,7 +45,7 @@ class RetryableAPIError(OneAPIError):
     """可重试的 OneAPI 异常（如 5xx / 429 等）"""
 
 
-class OneAPISvc:
+class OneApiSvc:
     def __init__(
         self,
         base_url: str = settings.ONEAPI_URL,
@@ -127,7 +56,7 @@ class OneAPISvc:
         self.base_url = base_url.rstrip("/")
         self.chat_url = f"{self.base_url}/chat/completions"
         self.embeddings_url = f"{self.base_url}/embeddings"
-        self.models_url = f"{self.base_url}/models"
+        self.models_url = f"{self.base_url}/v1/models"
         self.api_key = api_key 
         self.timeout = httpx.Timeout(timeout)
 
@@ -146,7 +75,7 @@ class OneAPISvc:
     @lru_cache(maxsize=128)
     def _get_default_headers(api_key: str) -> Dict[str, str]:
         """缓存请求头，避免重复创建字典"""
-        logger.debug("OneAPISvc: using api_key prefix: %s", api_key and api_key[:8])
+        logger.debug("OneApiSvc: using api_key prefix: %s", api_key and api_key[:8])
         return {
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
@@ -155,6 +84,7 @@ class OneAPISvc:
     def _headers(self) -> Dict[str, str]:
         """系统默认请求头（带缓存）"""
         return self._get_default_headers(self.api_key)
+
 
     @staticmethod
     def _get_user_headers(access_token: str) -> Dict[str, str]:
@@ -176,7 +106,7 @@ class OneAPISvc:
         )),
         reraise=True,
     )
-    async def _stream(self, payload: dict) -> StreamIterator:
+    async def _chat_llm_stream(self, payload: dict) -> StreamIterator:
         tracker = UsageTracker(
             messages=payload.get("messages", []),
             model=payload.get("model", "gpt-3.5-turbo"),
@@ -206,7 +136,7 @@ class OneAPISvc:
                         break
 
                     try:
-                        chunk = json_lib.loads(raw)
+                        chunk = json.loads(raw)
                     except json.JSONDecodeError:
                         logger.warning("Invalid chunk JSON: %s", raw[:100])
                         continue
@@ -219,7 +149,7 @@ class OneAPISvc:
 
         return StreamIterator(_inner_gen(), tracker, full_text)
 
-    async def _request(
+    async def _chat_llm(
         self,
         json_data: Dict[str, Any] | None,
         method: str = "POST",
@@ -247,28 +177,69 @@ class OneAPISvc:
 
         try:
             data = resp.json()
-        except Exception:
+        except Exception as e:
             # 非 JSON 响应，包装为 OneAPIError
             text = await resp.aread()
-            raise OneAPIError(f"Invalid JSON response HTTP {resp.status_code}: {text[:800]}")
+            print(text)
+            logger.error("Non-JSON response HTTP %s: %s", resp.status_code, str(text))
+            raise OneAPIError(f"Invalid JSON response HTTP {resp.status_code}: {str(e)}")
 
         usage = data.get("usage") or tracker.finalize(
             data.get("choices", [{}])[0].get("message", {}).get("content", "")
         )
         return data, usage
 
-    async def embeddings(self, model: str, input_text: str | List[str]) -> Tuple[Dict, Dict]:
-        return await self._request(
-            method="POST",
-            url=self.embeddings_url,
-            json_data={"model": model, "input": input_text},
-        )
+    # async def embeddings(self, model: str, input_text: str | List[str]) -> Tuple[Dict, Dict]:
+    #     return await self._request(
+    #         method="POST",
+    #         url=self.embeddings_url,
+    #         json_data={"model": model, "input": input_text},
+    #     )
 
-    async def models(self) -> Tuple[Dict, Dict]:
-        return await self._request(method="GET", 
-                                   url=self.models_url,
-                                   json_data={})
+    @staticmethod
+    async def channels():
+        chan_url = settings.ONEAPI_URL+'/api/channel/'
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    url=chan_url,
+                    headers= {
+                        "Authorization": f"Bearer {settings.ONE_API_ADMIN_KEY}",
+                        "Content-Type": "application/json",
+                    },
+                )
+                response.raise_for_status()
+                data = response.json()
+                return data.get("data", []) if isinstance(data, dict) else []
+        except httpx.TimeoutException:
+            print(f"get_one_api_channels timeout: {chan_url}")
+            return []
+        except Exception as ex:
+            print(f"[*error*]get_one_api_channels error: {ex}")
+            return []
+        pass
 
+    @staticmethod
+    async def models(models_url,timeout:int=10) -> List[Dict[str, Any]]:
+        try:
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                response = await client.get(
+                    url=models_url,
+                    headers= {
+                        "Authorization": f"Bearer {settings.ONE_API_MASTERKEY}",
+                        "Content-Type": "application/json",
+                    },
+                )
+                response.raise_for_status()
+                data = response.json()
+                return data.get("data", []) if isinstance(data, dict) else []
+        except httpx.TimeoutException:
+            print(f"get_one_api_models timeout: {models_url}")
+            return []
+        except Exception as ex:
+            print(f"[*error*]get_one_api_models error: {ex}")
+            return []
+        
     async def oneapi_request(self,  
                                 url: str,
                                 json_data: Dict[str, Any] | None,
@@ -325,11 +296,9 @@ class OneAPISvc:
         except httpx.HTTPStatusError as e:
             error_msg = f"Create user failed: {e.response.status_code} | {e.response.text[:800]}"
             logger.error(error_msg)
-            #raise HTTPException(status_code=e.response.status_code, detail=error_msg) from e
             return {"error": error_msg}
         except Exception as e:
             logger.exception("Unexpected error creating user")
-            #raise HTTPException(status_code=500, detail="Internal server error") from e
             return {"error": "Internal server error"}
 
     async def close(self):
@@ -348,94 +317,3 @@ class OneAPISvc:
     async def __aexit__(self):
         await self.close()
 
-    async def chat_llm(
-        self,
-        request: Request,
-        consume_svc: ConsumeService,
-        db: AsyncSession,
-        trans_repo: TransacDeps,
-        token_repo: TokenUsageRepo,
-        stream: bool,
-    ):
-        """核心聊天接口：结构优化、异常安全、日志增强"""
-        # 1. 认证与参数解析
-        rst = await apikey_crud.auth_user(db=db, request=request, balance_repo=trans_repo)
-        
-        if rst is None:
-            raise HTTPException(status_code=403,detail = "Invalid API Key")
-        
-        key_data = ApiKeyResp.model_validate(rst)
-
-        body = await request.json()
-        messages = body.get("messages", [])
-
-        if not messages:
-            raise HTTPException(status_code=400, detail="messages cannot be empty")
-
-        # 2. 模型与参数组装
-        tier = key_data.tier
-        model = resolve_model(tier, request.app.state.model_price_cache)
-        common_params = {
-            "model": model[0],
-            "messages": messages,
-            "temperature": 0.7,
-            "stream": stream,
-        }
-
-        # 3. 日志记录
-        token_log = await token_repo.add_token_log(
-            db=db,
-            uid=key_data.user_id,
-            json_data=common_params,
-            resp_data="api request received",
-        )
-
-        # 4. 非流式请求
-        if not stream:
-            data, usage = await self._request(json_data=common_params)
-
-            await consume_svc.charge(
-                token_usage=token_log,
-                user_data=key_data,
-                usage=usage,
-                request_model=model,
-                session=db,
-            )
-            return data
-
-        # 5. 流式响应（安全封装）
-        async def event_generator():
-            stream_iter = await self._stream(payload=common_params)
-            usage = None
-
-            try:
-                async for chunk in stream_iter:
-                    yield f"data: {json_lib.dumps(chunk, ensure_ascii=False)}\n\n"
-                usage = stream_iter.tracker.finalize("".join(stream_iter.full_text))
-
-            except ClientDisconnect:
-                logger.info("Client disconnected | user_id=%s", key_data.user_id)
-            except Exception as e:
-                logger.error("Stream error | user_id=%s, error=%s", key_data.user_id, str(e))
-                yield f"data: {json_lib.dumps({'error': 'stream error'})}\n\n"
-            finally:
-                # 确保计费一定执行
-                if usage:
-                    try:
-                        await consume_svc.charge(
-                            token_usage=token_log,
-                            user_data=key_data,
-                            usage=usage,
-                            request_model=model,
-                            session=db,
-                        )
-                    except Exception as charge_error:
-                        logger.critical(
-                            "Charge failed | user_id=%s, error=%s", key_data.user_id, str(charge_error)
-                        )
-
-        return StreamingResponse(
-            event_generator(),
-            media_type="text/event-stream",
-            headers={"Cache-Control": "no-cache"},
-        )

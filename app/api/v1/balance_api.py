@@ -1,18 +1,17 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.core.deps import get_db
-from app.features.db_base import ApiResp
+ 
 from app.features.biz.user_balance import transaction_reop
-from app.core.deps import get_token_cal_svc, get_transaction_rep, DepUser
+from app.core.deps import  get_transaction_rep
+from app.core.deps_auth import DepUser
 from app.features.user.model.user_model import User
-from app.features.biz.usage.model import TokenUsageLog
-from app.services.token_money_svc import TokenCostCalculator
+from app.core.deps import DbSessionDeps
 
 router = APIRouter(prefix="/balance", tags=["balance"])
 
 
 @router.get("/key/{api_key}")
-async def get_balance(api_key: str, db: AsyncSession = Depends(get_db)):
+async def get_balance(api_key: str, db: DbSessionDeps):
     """  
     
     Returns:
@@ -46,7 +45,7 @@ async def get_balance(api_key: str, db: AsyncSession = Depends(get_db)):
 
 @router.get("/billData")
 async def get_bill_data( cur_user: DepUser,
-                        db:AsyncSession=Depends(get_db),
+                        db:DbSessionDeps,
                         trans_rep :transaction_reop.TransactionRepo = Depends(get_transaction_rep),  
                          ):
     """Get user bill data."""

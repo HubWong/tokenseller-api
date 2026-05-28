@@ -1,9 +1,9 @@
 from fastapi import  Depends,Form, UploadFile, APIRouter, HTTPException, UploadFile, File
 from fastapi.responses import FileResponse
-from app.core.deps import DepUser, get_db
+from app.core.deps import DepUser
 from app.features.user_file.user_file_crud import user_file_crud
-from app.features.user.model.user_model import User
-from sqlalchemy.ext.asyncio import AsyncSession
+from app.core.deps import DbSessionDeps
+
 from app.features.user.photo_crud import photo_crud
 from app.services.file_svc import delete_image_by_public_id
 from app.features.db_base import ApiResp
@@ -12,7 +12,7 @@ import os
 router = APIRouter(prefix="/files", tags=["files"])
 
 @router.get("/download/{file_id}") #user friend can download or view the file.
-async def download_file(file_id: int, db=Depends(get_db)):
+async def download_file(file_id: int, db:DbSessionDeps):
     file = await user_file_crud.get_file_by_id(db, id=file_id)
     
     if not file:
@@ -29,7 +29,7 @@ async def download_file(file_id: int, db=Depends(get_db)):
 
 #photo upload , file shares in chat room 
 @router.post("/upload")
-async def upload_file(file: UploadFile,cur_user:DepUser,type:str = Form(...), db=Depends(get_db), )->ApiResp:
+async def upload_file(file: UploadFile,db:DbSessionDeps,cur_user:DepUser,type:str = Form(...),  )->ApiResp:
     #create a file in db and the cloud db.
     if type =='photo':
         resp = await photo_crud.create(db=db, file=file, user=cur_user)      
@@ -45,7 +45,7 @@ async def upload_file(file: UploadFile,cur_user:DepUser,type:str = Form(...), db
 @router.put("/avatar")
 async def upload_avatar(
     *,
-    db: AsyncSession = Depends(get_db),
+    db: DbSessionDeps,
     avatar: UploadFile = File(...),
     current_user: DepUser,
 ) -> ApiResp:
@@ -66,7 +66,7 @@ async def upload_avatar(
    
 
 @router.delete("/del_photo/{photo_id}")
-async def delete_photo(photo_id: int, db= Depends(get_db), cur_DepUser):
+async def delete_photo(photo_id: int, db:DbSessionDeps, cur_DepUser):
     if not cur_user.id:
         return ApiResp(success=False, message="用户ID不能为空") 
     isAvatar,deleted_photo =await photo_crud.delete_photo(db=db, photo_id=photo_id)
@@ -83,7 +83,7 @@ async def delete_photo(photo_id: int, db= Depends(get_db), cur_DepUser):
 
 
 @router.get("/get_photos")
-async def get_photos(db= Depends(get_db), cur_DepUser):
+async def get_photos(db: DbSessionDeps, cur_DepUser):
     user_id = cur_user.id
     if not user_id:
         return ApiResp(success=False, message="用户ID不能为空")
@@ -97,7 +97,7 @@ async def get_photos(db= Depends(get_db), cur_DepUser):
 
 
 @router.patch('/is_private/{photo_id}')
-async def toggle_photo_privacy(photo_id: int, db= Depends(get_db), cur_DepUser):
+async def toggle_photo_privacy(photo_id: int, db:DbSessionDeps, cur_DepUser):
     if not cur_user.id:
         return ApiResp(success=False, message="用户ID不能为空") 
     updated_photo = await photo_crud.update_privacy(db=db, photo_id=photo_id, user_id=cur_user.id)

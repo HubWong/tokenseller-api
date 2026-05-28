@@ -1,17 +1,12 @@
 from typing import Optional
-from aiohttp import http_exceptions
-from aiohttp.http_exceptions import HttpBadRequest
 from sqlalchemy.ext.asyncio import AsyncSession
-from collections.abc import Sequence
 from fastapi import Request,HTTPException
-from sqlalchemy import select
+from sqlalchemy import Update, select
 from app.features.crud_base import CRUDBase
 from app.features.db_base import ApiResp
 from app.features.biz.apikey.apikey_model import ApiKey
 from app.features.biz.apikey.apikey_schema import ApiKeyResp
 from app.core.security import gen_api_key
-import json
-from datetime import  datetime,timedelta
 
 from app.features.biz.user_balance.transaction_reop import TransactionRepo
 
@@ -43,7 +38,7 @@ class CRUDApiKey(CRUDBase[ApiKey, ApiKeyResp, ApiKeyResp]):
             print("error:", str(ex))
         return key   
      
-    async def auth_user(self,db: AsyncSession, request: Request,balance_repo:TransactionRepo) -> ApiKey:
+    async def auth_user(self,db: AsyncSession, request: Request,balance_repo:TransactionRepo) -> tuple:
         auth = request.headers.get("Authorization")
         if not auth:
             raise HTTPException(401, "Missing API Key")
@@ -58,7 +53,7 @@ class CRUDApiKey(CRUDBase[ApiKey, ApiKeyResp, ApiKeyResp]):
         left = await balance_repo.query_transaction_sum(session=db, maker_id=uid)
         if left == 0:
             raise HTTPException(status_code=402,detail = "No token left")
-        return user
+        return user,left
 
     
     async def get_user_from_key(self,db:AsyncSession, key: str)->Optional[ApiKey]:
@@ -70,6 +65,21 @@ class CRUDApiKey(CRUDBase[ApiKey, ApiKeyResp, ApiKeyResp]):
         api_key = result.scalar_one_or_none()
         
         return api_key
+    
+    async def update_tier_by_id_cmmition(self, uid:int, tier: str, db: AsyncSession):
+        ''''
+        update user tier after paying success
+        '''
+        stmt = select(ApiKey).where(ApiKey.user_id == uid)
+        result = await db.execute(stmt)
+        api_key = result.scalar_one_or_none()
+        if api_key:
+            try:
+                Update(ApiKey).where(ApiKey.id == api_key.id).values(tier=tier).execution_options(synchronize_session="fetch")                 
+                 
+            except Exception as e:
+                await db.rollback()
+                 
     
     async def delete_key(self, db: AsyncSession, key_id: str, user_id: int) -> None:
         stmt = select(ApiKey).where(ApiKey.key == key_id, ApiKey.user_id == user_id)

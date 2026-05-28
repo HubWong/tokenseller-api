@@ -4,16 +4,15 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
-
+from app.core.deps import DbSessionDeps, UserRepoDeps
 from app.core.config import settings
-from app.core.deps import get_db
 from app.features.biz.user_balance.models import TransactionType
-from app.features.user.user_crud import user_crud
 from app.features.user.model.user_model import User
-from app.core.security import create_access_token, create_refresh_token, generate_invite_code, get_password_hash
-from app.core.deps import get_oneapi_svc, get_token_usage_rep,get_transaction_rep
-from app.services.oneapi_svc import OneAPISvc
-from app.features.biz.usage.token_usage_repo import TokenUsageRepo
+from app.core.security import create_access_token, create_refresh_token, generate_invite_code
+from app.core.deps import  TransRepoDeps
+from app.core.deps_svc import OneApiDeps
+
+ 
 from app.features.biz.user_balance.transaction_reop import TransactionRepo
 from app.features.biz.apikey.apikey_crud import apikey_crud
 from authlib.integrations.starlette_client import OAuth
@@ -73,9 +72,10 @@ async def get_or_create_oauth_user(
     db: AsyncSession,
     email: str,
     provider: str,
+    one_api_svc:OneApiDeps,
+    user_crud: UserRepoDeps,
     provider_id: Optional[str] = None,
     name: Optional[str] = None,
-    one_api_svc: Optional[OneAPISvc] = None,
     transaction_repo: Optional[TransactionRepo] = None,
 ) -> User:
     """获取或创建 OAuth 用户"""
@@ -109,7 +109,8 @@ async def get_or_create_oauth_user(
     await db.refresh(user)
 
     # 生成邀请码
-    user.invite_code = generate_invite_code(getattr(user,'id'))
+    invite_code = generate_invite_code(getattr(user,'id'))
+    setattr(user, 'invite_code', invite_code)
     await db.commit()
     await db.refresh(user)
 
@@ -127,7 +128,7 @@ async def get_or_create_oauth_user(
 
     # 生成 API Key
     try:
-        await apikey_crud.generate_api_key(db=db, user_id=user.id)
+        await apikey_crud.generate_api_key(db=db, user_id=getattr(user, 'id'))
         await db.commit()
     except Exception as e:
         logger.warning(f"Failed to generate API key for OAuth user: {e}")
@@ -135,7 +136,9 @@ async def get_or_create_oauth_user(
     # 同步到 OneAPI
     if one_api_svc:
         try:
-            await one_api_svc.create_oneapi_user(username=username, pwd=f"oauth_{provider}_{provider_id}")
+            await one_api_svc.create_oneapi_user(username=username, 
+                access_token=settings.ONEAPI_ACCESS_TOKEN, 
+                pwd=f"oauth_{provider}_{provider_id}")
         except Exception as e:
             logger.warning(f"Failed to create OneAPI user for OAuth: {e}")
 
@@ -153,12 +156,12 @@ async def github_login(request: Request):
 
 
 @router.get("/callback/github")
-async def github_callback(
-    request: Request,
-    db: AsyncSession = Depends(get_db),
-    one_api_svc: OneAPISvc = Depends(get_oneapi_svc),
-    transaction_repo: TransactionRepo = Depends(get_transaction_rep),
-):
+async def github_callback(request: Request,
+    db:DbSessionDeps,
+    crud_user: UserRepoDeps,
+    onapi_svc: OneApiDeps,
+    transaction_repo: TransRepoDeps
+    ):
     """GitHub OAuth 回调处理"""
     try:
         token = await oauth.github.authorize_access_token(request)
@@ -179,12 +182,13 @@ async def github_callback(
 
         # 获取或创建用户
         user = await get_or_create_oauth_user(
-            db,
+            db=db,
             email=email,
             provider="github",
+            user_crud=crud_user,
             provider_id=str(user_data.get("id")),
             name=username,
-            one_api_svc=one_api_svc,
+            one_api_svc=onapi_svc,
             transaction_repo=transaction_repo,
         )
 
@@ -223,9 +227,10 @@ async def google_login(request: Request):
 @router.get("/callback/google")
 async def google_callback(
     request: Request,
-    db: AsyncSession = Depends(get_db),
-    one_api_svc: OneAPISvc = Depends(get_oneapi_svc),
-    transaction_repo: TransactionRepo = Depends(get_transaction_rep),
+    db: DbSessionDeps,
+    one_api_svc:OneApiDeps,
+    crud_user:UserRepoDeps,
+    transaction_repo: TransRepoDeps
 ):
     """Google OAuth 回调处理"""
     try:
@@ -249,6 +254,7 @@ async def google_callback(
             provider="google",
             provider_id=user_info.get("sub"),
             name=username,
+            user_crud=crud_user,
             one_api_svc=one_api_svc,
             transaction_repo=transaction_repo,
         )

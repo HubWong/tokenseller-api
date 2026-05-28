@@ -13,7 +13,7 @@ from app.features.crud_base import CRUDBase
 from app.features.db_base import ApiResp
 from app.features.user.model.user_photo import Photo
 from app.features.user.model.user_model import User
-from app.features.user.user_crud import user_crud
+from app.core.deps import UserRepoDeps
 
 from app.features.user.schemas.photo_schema import PhotoCreate, PhotoUploadResp, UserPhoto
 from app.services.file_svc import upload_and_resize_image, delete_image_by_public_id
@@ -110,7 +110,7 @@ class CRUDphoto(CRUDBase[Photo, PhotoCreate, PhotoCreate]):
             photoOut = UserPhoto.model_validate(photo)
             return photoOut
     
-    async def add_or_update_avatar(self, db: AsyncSession, file: UploadFile, user: User) -> ApiResp[str]:
+    async def add_or_update_avatar(self, db: AsyncSession,user_crud: UserRepoDeps, file: UploadFile, user: User) -> ApiResp[str]:
         # 异步获取用户（user_crud 也需支持 async）
         db_user: Optional[User] = await user_crud.get_by_email(db=db, emailOrTel=str(user.email))
         print('prv_avatar:', db_user.avatar if db_user else "User not found")

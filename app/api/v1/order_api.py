@@ -1,18 +1,19 @@
 # -*- coding: utf-8 -*-
 import logging
-from typing import Any, List, Optional, Tuple
+from typing import Any, List
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import RedirectResponse
-from app.core.deps import admin_required, get_buy_svc, DepUser, get_order_rep, get_paypal_svc
+from app.core.deps import  get_order_rep
+from app.core.deps_auth import admin_required,DepUser
+from app.core.deps_svc import get_buy_svc,get_paypal_svc
 from app.features.biz.order.order_schema import PurchaseRequest
 from app.features.user.model.user_model import User
 from app.features.db_base import ApiResp, PagedResp
 from app.features.biz.order.order_repo import OrderRepo
 from app.features.biz.order.order_schema import OrderInDBBase
-from app.core.abc_biz import BuyService
+from app.core.abc.abc_biz import BuyService
 from app.features.user.schemas.user_role import UserRole
 from app.services.paypal_svc import PayPalSvc
-from app.services.listener_svc import order_pool
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -20,7 +21,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/orders", tags=["orders"])
 
 
-@router.post("/")
+@router.post("/create")
 async def create_order(
     order: PurchaseRequest,
     user: DepUser,
@@ -38,7 +39,7 @@ async def create_order(
 
         paypal_order = await paypal_svc.create_paypal_order(
             amount_usd=order.amount,
-            order_id=db_order.id,
+            order_id=getattr(db_order, "id"),
             return_url=return_url,
             cancel_url=cancel_url,
         )
@@ -49,7 +50,7 @@ async def create_order(
         return ApiResp(
             success=True,
             message="PayPal order created",
-            data={"approval_url": approval_url, "order_id": db_order.id},
+            data={"approval_url": approval_url, "order_id": getattr(db_order, "id")},
         )
 
     return result
@@ -106,7 +107,7 @@ async def paypal_cancel():
 
 @router.delete("/{order_id}")
 async def delete_order(order_id: int, user: User = Depends(admin_required), order_repo: OrderRepo = Depends(get_order_rep)) -> ApiResp[Any]:
-    r = await order_repo.cancel_order(order_id, uid=user.id, username=user.username)
+    r = await order_repo.cancel_order(order_id, uid=getattr(user, 'id'), username=getattr(user, 'username'))
     return ApiResp(success=r, message="Order cancelled" if r else "Order not found")
 
 
@@ -123,10 +124,9 @@ async def list_orders(
     pg: int,
     pg_size: int,
     cur_user: DepUser,
-    order_repo: OrderRepo = Depends(get_order_rep),
-
+    order_repo: OrderRepo = Depends(get_order_rep)
 ) -> PagedResp[List[OrderInDBBase]]:
-    if cur_user.role == UserRole.USER and cur_user.email != 'wyb6688@hotmail.com':
-        return PagedResp(success=False, message="user is not a seller")
+    if cur_user.role == UserRole.USER.value and cur_user.email != 'wyb6688@hotmail.com':
+        return PagedResp(success=False, message="user is not a seller", data=[], total=0, page=pg)
     orders, total = await order_repo.list_orders(page=pg, limit=pg_size)
-    return PagedResp(success=True, data=orders, message=f"Total orders: {total}", total=total, page=pg, page_size=pg_size)
+    return PagedResp(success=True, data=orders, message=f"Total orders: {total}", total=total or 0, page=pg, size=pg_size)

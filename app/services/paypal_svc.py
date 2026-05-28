@@ -1,4 +1,4 @@
-from app.core.abc_biz import logger
+from app.core.abc.abc_biz import logger
 import httpx
 from app.core.config import settings
 
@@ -8,6 +8,8 @@ PAYPAL_ORDER_URL = "/v2/checkout/orders"
 
 class PayPalSvc:
     def __init__(self):
+        if settings.PAYPAL_CLIENT_ID is None or settings.PAYPAL_CLIENT_SECRET is None:
+            raise ValueError("PayPal client ID or secret is not set")
         self.client_id = settings.PAYPAL_CLIENT_ID
         self.client_secret = settings.PAYPAL_CLIENT_SECRET
         self.base_url = settings.PAYPAL_BASE_URL

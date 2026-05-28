@@ -1,4 +1,4 @@
-from app.core.abc_biz import BaseService, BuyService, logger
+from app.core.abc.abc_biz import BaseService, BuyService, logger
 from app.features.biz.usage.token_usage_repo import TokenUsageRepo
 from app.features.biz.user_balance.transaction_reop import TransactionRepo
 from app.services.token_money_svc import TokenCostCalculator
@@ -20,7 +20,7 @@ async def main():
 
     async with AsyncSessionLocal() as session:
         transaction_repo = TransactionRepo(db=session)
-        base_service = BaseService(transc_rep=transaction_repo, redis_client=order_pool._redis)
+        base_service = BaseService(db=session, redis_client=order_pool._redis)
         order_repo = OrderRepo(db=session)
         token_repo = TokenUsageRepo(db=session)
         token_cal_svc = TokenCostCalculator(price_db=session)
@@ -48,7 +48,7 @@ async def main():
                 return
 
             try:
-                paid = await buy_service.pay_order(order_id, data)
+                paid = await buy_service.pay_order(order_id)
                 if not paid:
                     logger.warning('Payment processing failed or order not found: %s', order_id)
                     return

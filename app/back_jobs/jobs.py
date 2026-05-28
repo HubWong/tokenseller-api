@@ -1,8 +1,13 @@
 from datetime import datetime
+
+import httpx
 from app.core.database import AsyncSessionLocal
 from app.back_jobs.db_tasks import clean_expired_files_db
 from app.features.biz.order.price_repo import PriceRepo
 from app.features.biz.order.order_repo import OrderRepo
+from app.core.config import settings
+
+oneapi_url = settings.ONEAPI_URL
 import asyncio
 # 顶层统一运行异步任务的工具函数
 def run_async_task(coro):
@@ -29,17 +34,18 @@ async def run_remove_expired_orders():
 
 def job_clean_expired_files():    
     run_async_task(run_clean())
-    pass
+    
 
 def job_remove_expired_orders():
     run_async_task(run_remove_expired_orders())
     
-    pass
+    
 
 
 def job_gen_reports():
     print("job_gen_reports running...",datetime.now())
-    pass
+    
+
 
 async def get_model_pricing_cache():
     """从数据库加载模型定价数据到内存缓存"""

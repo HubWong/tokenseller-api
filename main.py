@@ -31,7 +31,7 @@ async def root():
 
 @app.get('/price',response_model=list)
 async def get_model_price(): 
-    return app.state.model_price_cache
+    return app.state.oneapi_channels
 
 if __name__ == "__main__":
     import uvicorn

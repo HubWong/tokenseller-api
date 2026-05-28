@@ -1,11 +1,11 @@
 from apscheduler.schedulers.background import BackgroundScheduler
-from app.back_jobs.jobs import job_clean_expired_files,job_remove_expired_orders, job_gen_reports,get_model_pricing_cache
+from app.back_jobs.jobs import job_clean_expired_files,job_remove_expired_orders, job_gen_reports
 from contextlib import asynccontextmanager, suppress
 from fastapi import FastAPI
 import asyncio
 from app.services.file_svc import create_upload_dir
 from concurrent.futures import ThreadPoolExecutor
-from app.services.oneapi_svc import OneAPISvc
+from app.services.oneapi_svc import OneApiSvc
 from app.services.listener_svc import order_pool
 from app.core.config import settings
 from app.core.database import Base, async_engine, sync_columns
@@ -127,9 +127,8 @@ async def lifespanJob(app: FastAPI):
     await sync_columns()
     await seed_pricing_data()
     create_upload_dir()
-    app.state.oneapi_svc = OneAPISvc()
-    app.state.model_price_cache = await get_model_pricing_cache() # 用于缓存模型定价数据，减少数据库查询
-    # Initialize Redis connection for order_pool (shared with listener process)
+    app.state.oneapi_svc = OneApiSvc()
+    app.state.oneapi_channels = await OneApiSvc.channels() # 用于缓存模型定价数据，减少数据库查询
     await order_pool.init_redis()
 
     async def _listener_background():

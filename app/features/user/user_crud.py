@@ -1,11 +1,10 @@
 from datetime import date, datetime, timezone
-from typing import Optional, List, Any, Tuple
+from typing import Optional,Tuple,Any
 from sqlalchemy import or_, case, func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from collections.abc import Sequence
 from app.features.biz.user_balance.models import TransactionType
-from app.features.crud_base import CRUDBase
 from app.features.db_base import ApiResp
 from app.core.config import settings
 from app.features.user.model.user_model import User,UserRole
@@ -23,364 +22,234 @@ from app.core.security import (
 from app.services.tools_svc import check_api_reachable
 from app.features.biz.apikey.apikey_crud import apikey_crud
 from app.services.email_svc import smtp
-from app.features.biz.user_balance.transaction_reop import TransactionRepo
-from app.services.oneapi_svc import OneAPISvc
+from app.services.oneapi_svc import OneApiSvc
 
+import logging
+from datetime import datetime, timezone
+from typing import Optional, Sequence, Tuple
+from sqlalchemy import select, update, func, or_
+from sqlalchemy.exc import IntegrityError
+# 其他依赖请按需保留
 
-class CRUDUser(CRUDBase[User, UserCreate, UserCvUpdate]): 
-
-    async def get_by_email(self, db: AsyncSession, *, emailOrTel: str) -> Optional[User]:
-        stmt = select(User).where(User.email == emailOrTel)
-        result = await db.execute(stmt)
-        return result.scalars().first()
-    
-
-    async def get_by_username(self, db: AsyncSession, *, username: str) -> Optional[User]:
-        stmt = select(User).where(User.username == username)
-        result = await db.execute(stmt)
-        return result.scalars().first()
-
-
-    async def get_invite_userId(self, db: AsyncSession, *, invite: str) -> Optional[int]:
-        stmt = select(User.id).where(User.invite_code == invite)
-        result = await db.execute(stmt)
-        user_id = result.scalar()
-        return user_id  
-
-    async def get_parent(self,db:AsyncSession,user_id:int)->Optional[int]:
-        stmt = select(User.parent_id).where(User.id == user_id)
-        result = await db.execute(stmt)
-        pid= result.scalar_one_or_none()
-        return pid
-
-    async def get_by_id(self, db: AsyncSession, id: int)->Optional[User]:
-        stmt = select(User).where(User.id==id)
-        result = await db.execute(stmt)
-        return result.scalars().first()      
-      
-
-    async def create(self,one_api_svc:OneAPISvc, transaction_repo:TransactionRepo, db: AsyncSession, *, obj_in: UserCreate) -> ApiResp[dict|bool]:
-        try:
-            if len(obj_in.password) < 8:
-                return ApiResp(success=False, data=False, message="Password must be at least 6 characters long")
-            
-            existing_user = await self.get_by_email(db, emailOrTel=obj_in.email)
-            if existing_user:
-                return ApiResp(success=False, data=False, message="Email already registered")
-
-            # ✅ 密码哈希
-            hashed = get_password_hash(obj_in.password)        
-            username = obj_in.email.split('@')[0]
-
-            # ✅ 构建用户对象
-            db_obj = User(
-                email=obj_in.email,
-                hashed_password=hashed,
-                pc_id=obj_in.pc_id,
-                memo='test',
-                username = username      
-            )
-            # ✅ 处理邀请码
-            if obj_in.invite_code:
-                inviter_id = await self.get_invite_userId(db=db, invite=obj_in.invite_code)
-                if inviter_id:                   
-                    setattr(db_obj,'parent_id',inviter_id)
-            db.add(db_obj)
-            await db.commit()
-            await db.refresh(db_obj) 
-            await transaction_repo.create_transaction(
-                session=db,
-                maker_id=int(getattr(db_obj,'id')),
-                amount=settings.FREE_AMOUNT,
-                transaction_type=TransactionType.RECHARGE_FREE
-            )
-            await db.commit()
-            await apikey_crud.generate_api_key(db=db,user_id= int(getattr(db_obj,'id')))
-            if check_api_reachable(settings.ONEAPI_URL,3):
-                await one_api_svc.create_oneapi_user(username=username,
-                                                     pwd=obj_in.password,
-                                                     access_token=settings.ONEAPI_ACCESS_TOKEN)
-            return ApiResp(success=True, data=True, message='')
-
-        except IntegrityError as e:
-            print('error:', e)
-            # 可能因唯一约束（如 email 唯一）再次触发冲突（并发场景）
-            await db.rollback()
-            return ApiResp(success=False, data=False, message="Email already registered (concurrent request)")
-
-        except Exception as e:
-            print('error:', e)
-            await db.rollback()
-            # 🔒 安全建议：生产环境避免泄露具体错误，可记日志，前端返回通用消息
-            import logging
-            logging.error(f"User creation failed: {e}", exc_info=True)
-            return ApiResp(success=False, data=False, message="Failed to create user. Please try again.")
-
-
-    async def update_password(
-        self, db: AsyncSession, *, db_obj: User, new_password: str
-    ) -> User:
-        if len(new_password) < 6:
-            raise ValueError("Password must be at least 6 characters long")
-        hashed = get_password_hash(new_password)
-        stmt = (
-            update(User)
-            .where(User.id == db_obj.id)
-            .values(hashed_password=hashed, updated_at=datetime.now(timezone.utc))
-        )
-        await db.execute(stmt)
-        await db.commit()
-        return await self.get(db, id=db_obj.id)
-
-    async def _update_user_session(self,user: User, pc_id: str):
-        setattr(user, "pc_id", pc_id)
-        userIndb = UserInDB.model_validate(user)
-        print("\t [&*&] Updating user session for user_id:", user.id, "pc_id:", pc_id)
-        
-    
-    
-    async def update_cv(self, db: AsyncSession, *, db_obj: User, obj_in: UserCvUpdate) -> User:
-        res = await super().update(db=db, db_obj=db_obj, obj_in=obj_in)
-        if res:
-            # 更新用户会话信息（如在 socket 连接中）           
-            await self._update_user_session(res, pc_id=getattr(db_obj,'pc_id',''))        
-        return res
-
-    async def login_user(
-        self, db: AsyncSession, *, emailOrTel: str, password: str, pc_id: str
-    ) -> ApiResp[Optional[TokenSchemaUser]]:
-        user = await self.authenticate(db, email=emailOrTel, password=password, pc_id=pc_id)
-        if not user:
-            return ApiResp(success=False, message="Invalid credentials", data=None)
-        if user.is_active is False:
-            return ApiResp(success=False, message="User is inactive", data=None)
-        exp, refresh_token = create_refresh_token(int(str(getattr(user, 'id'))))        
-        await token_crud.create_token(db, user_id=int(str(user.id)), token=refresh_token, expire_at=exp)
-        loginResp = UserLoginResp.model_validate(user)
-        user_role = getattr(user,'role',UserRole.USER).value
-        tknSchUser = TokenSchemaUser(
-            token= create_access_token(getattr(user,'id'),user_role),
-            refresh_token=refresh_token,
-            user=loginResp,
-            token_type="bearer",
-        )
-        #await self._update_user_session(user, pc_id)        
-        return ApiResp(success=True, message=str(user.id), data=tknSchUser)
-
-
-    async def authenticate(
-        self, db: AsyncSession, *, email: str, password: str, pc_id: str
-    ) -> Optional[User]:
-        try:
-            user = await self.get_by_email(db, emailOrTel=email)
-            if not user:
-                return None
-            hashed = getattr(user, "hashed_password", None)            
-            if not hashed or not verify_password(password, hashed):
-                return None
-
-            updated = False
-            if user.invite_code is None:
-                d =  generate_invite_code(int(str(user.id)))
-                setattr(user, "invite_code", d)
-                updated = True
-            if user.pc_id is not pc_id:
-                setattr(user, "pc_id", pc_id)
-                updated = True
-            if updated:
-                user.updated_at = datetime.now(timezone.utc) 
-                db.add(user)
-                await db.commit()
-                await db.refresh(user)
-            
-            return user
-        except Exception as e:
-            print("Auth error:", e)
-            return None
-
-
-    async def user_list(
-        self,
-        db: AsyncSession,
-        *,
-        size: int = 10,
-        for_admin: bool = False,  # 规范命名：蛇形命名 for_admin (Python 标准)
-        page: int = 1,
-        sort_by: str = "id",        # 支持排序字段：id, name, created_at
-        sort_order: str = "asc",    # asc / desc
-        ) -> Tuple[Sequence[UserForAdmin], int]:
-        """
-        返回：(用户列表, 总记录数)
-        """
-        # 1. 参数合法性校验与默认值处理
-        page = max(page, 1)
-        size = max(min(size, 100), 1)  # 一行搞定：1 ≤ size ≤ 100
-
-        # 合法排序字段/方向
-        valid_sort_fields = ["id", "name", "created_at"]
-        valid_sort_orders = ["asc", "desc"]
-        sort_by = sort_by if sort_by in valid_sort_fields else "id"
-        sort_order = sort_order if sort_order in valid_sort_orders else "asc"
-
-        # 2. 构建基础查询
-        query = select(User).where(User.is_active.is_(True))  # 更规范的布尔判断
-
-        # 非管理员仅查询普通用户
-        if not for_admin:
-            query = query.where(User.role == UserRole.USER)
-
-        # 3. 查询总条数（优化：无需子查询，直接 count 原表，性能更好）
-        count_query = select(func.count()).select_from(User).where(*query.whereclause)  # 直接复用 where 条件，无需子查询
-        total_result = await db.execute(count_query)
-        total = total_result.scalar_one_or_none() or 0
-
-        if total == 0:
-            return [], 0
-
-        # 4. 动态排序（安全、无异常、类型安全）
-        sort_column = getattr(User, sort_by)
-        sort_expression = sort_column.asc() if sort_order == "asc" else sort_column.desc()
-
-        # 5. 分页查询
-        skip = (page - 1) * size
-        paginated_query = query.order_by(sort_expression).offset(skip).limit(size)
-
-        result = await db.execute(paginated_query)
-        db_objs = result.scalars().all()
-
-        # 6. 转换为 Pydantic 模型（列表推导式更简洁）
-        data = [UserForAdmin.model_validate(obj) for obj in db_objs]
-
-        return data, total
-
-    async def search_users(
-        self,
-        db: AsyncSession,
-        *,
-        area: str,
-        keyword: str,
-        gender: int = -1,
-        min_age: Optional[int] = None,
-        max_age: Optional[int] = None,
-        page: int = 1,
-        limit: int = 10,
-    ) -> Tuple[int, Sequence[UserInDB]]:
-        query = select(User).where(User.on_show == True)
-
-        if gender != -1:
-            query = query.where(User.gender == gender)
-
-        today = date.today()
-        if min_age is not None:
-            max_birthYear = today.year - min_age
-            query = query.where(User.birth_year <= max_birthYear)
-        if max_age is not None:
-            min_birthYear = today.year - max_age - 1
-            query = query.where(User.birth_year > min_birthYear)
-        if area:
-            query = query.where(User.living_city == area)
-            
-        if keyword:
-            k = f"%{keyword}%"
-            query = query.where(
-                or_(
-                    User.username.ilike(k),
-                    User.bio.ilike(k),
-                    User.living_city.ilike(k),
-                    User.dowry.ilike(k),
-                )
-            )
-
-        # ✅ 异步总数 & 分页
-        count_stmt = select(func.count()).select_from(query.subquery())
-        total = await db.scalar(count_stmt) or 0
-        if total>0:
-            offset = (page - 1) * limit
-            stmt = query.order_by(User.created_at.desc()).offset(offset).limit(limit)
-            result = await db.execute(stmt)
-            users = result.scalars().all()
-
-            return total, [UserInDB.model_validate(u) for u in users]
-        return 0, []
- 
-
-
-    async def request_reset_pwd(self, email: str, db: AsyncSession) -> ApiResp:
-        user = await self.get_by_email(db, emailOrTel=email)  
-        if not user:
-            return ApiResp(success=False, message="User not found")
-
-        try:
-            reset_token = smtp.create_reset_token(email)
-            setattr(user, "reset_pwd_token", reset_token)
-            setattr(user, "updated_at", datetime.now(timezone.utc))
-            db.add(user)
-            await db.commit()
-            await db.refresh(user)
-            return await smtp.send_email_async(to=email, token=reset_token)
-        except Exception as e:
-            await db.rollback()
-            return ApiResp(success=False, message=str(e))
-
-    async def get_by_pc_Id(self, db: AsyncSession, pcId: str) -> Optional[User]:
-        stmt = select(User).where(User.pc_id == pcId)
-        result = await db.execute(stmt)
-        return result.scalars().first()
-
-    async def down_cv(self, db: AsyncSession, uid: int) -> bool:
-        user = await self.get(db, id=uid)
+class UserRepo: 
+    async def update_username(self, uid:int, username:str,db:AsyncSession):
+        user = await self.get_by_id(db=db,id=uid)
         if user:
-            setattr(user,'on_show',False)
-            user.updated_at = datetime.now(timezone.utc)
-            db.add(user)
+            setattr(user, 'username', username)
             await db.commit()
             await db.refresh(user)
             return True
         return False
 
+  
+    async def get_by_email(self, db: AsyncSession, *, emailOrTel: str) -> Optional[User]:
+        result = await db.execute(select(User).where(User.email == emailOrTel))
+        return result.scalars().first()
+        
+    async def get_by_username(self, db: AsyncSession, *, username: str) -> Optional[User]:
+        result = await db.execute(select(User).where(User.username == username))
+        return result.scalars().first()
+
+    async def get_invite_userId(self, db: AsyncSession, *, invite: str) -> Optional[int]:
+        result = await db.execute(select(User.id).where(User.invite_code == invite))
+        return result.scalar_one_or_none()  # ✅ 防无结果/多结果报错
+
+    async def get_parent(self, db: AsyncSession, user_id: int) -> Optional[int]:
+        result = await db.execute(select(User.parent_id).where(User.id == user_id))
+        return result.scalar_one_or_none()
+
+    async def get_by_id(self, db: AsyncSession, id: int) -> Optional[User]:
+        result = await db.execute(select(User).where(User.id == id))
+        return result.scalars().first()      
+
+    async def create(self, one_api_svc: OneApiSvc, transaction_repo: Any, db: AsyncSession, *, obj_in: UserCreate) -> ApiResp[dict|bool]:
+        try:
+            if len(obj_in.password) < 8:
+                return ApiResp(success=False, data=False, message="Password must be at least 8 characters long")
+            
+            if await self.get_by_email(db, emailOrTel=obj_in.email):
+                return ApiResp(success=False, data=False, message="Email already registered")
+
+            db_obj = User(
+                email=obj_in.email,
+                hashed_password=get_password_hash(obj_in.password),
+                pc_id=obj_in.pc_id,
+                memo='test',
+                username=obj_in.email.split('@')[0]
+            )
+            if obj_in.invite_code:
+                inviter_id = await self.get_invite_userId(db=db, invite=obj_in.invite_code)
+                if inviter_id:  
+                    setattr(db_obj, 'parent_id', inviter_id)                 
+                    
+            db.add(db_obj)
+            await db.flush()  # ✅ 使用 flush 获取 id，避免重复 commit
+            await transaction_repo.create_transaction(
+                session=db, maker_id=db_obj.id, amount=settings.FREE_AMOUNT, transaction_type=TransactionType.RECHARGE_FREE
+            )
+            await db.flush()
+            uid = setattr(db_obj, 'id', db_obj.id)
+            await apikey_crud.generate_api_key(db=db, user_id=int(uid))
+            
+            if check_api_reachable(settings.ONEAPI_URL, 3):
+                await one_api_svc.create_oneapi_user(username=db_obj.username, pwd=obj_in.password, access_token=settings.ONEAPI_ACCESS_TOKEN)
+                
+            await db.commit()
+            await db.refresh(db_obj) 
+            return ApiResp(success=True, data=True, message='')
+
+        except IntegrityError as e:
+            await db.rollback()
+            logging.error(f"User creation IntegrityError: {e}")
+            return ApiResp(success=False, data=False, message="Email already registered (concurrent request)")
+        except Exception as e:
+            await db.rollback()
+            logging.error(f"User creation failed: {e}", exc_info=True)
+            return ApiResp(success=False, data=False, message="Failed to create user. Please try again.")
+
+    async def update_password(self, db: AsyncSession, *, db_obj: User, new_password: str) -> User:
+        if len(new_password) < 6:
+            raise ValueError("Password must be at least 6 characters long")
+        stmt = update(User).where(User.id == db_obj.id).values(
+            hashed_password=get_password_hash(new_password), updated_at=datetime.now(timezone.utc)
+        )
+        await db.execute(stmt)
+        await db.commit()
+        return await self.get(db, id=db_obj.id)  # 假设基类已实现 get
+
+    async def _update_user_session(self, user: User, pc_id: str):
+        user.pc_id = pc_id
+        logging.info(f"Updating user session for user_id: {user.id}, pc_id: {pc_id}")
+        
+    
+
+    async def login_user(self, db: AsyncSession, *, emailOrTel: str, password: str, pc_id: str) -> ApiResp[Optional[TokenSchemaUser]]:
+        user = await self.authenticate(db, email=emailOrTel, password=password, pc_id=pc_id)
+        if not user: return ApiResp(success=False, message="Invalid credentials", data=None)
+        if not user.is_active: return ApiResp(success=False, message="User is inactive", data=None)
+        
+        exp, refresh_token = create_refresh_token(user.id)        
+        await token_crud.create_token(db, user_id=user.id, token=refresh_token, expire_at=exp)
+        
+        tknSchUser = TokenSchemaUser(
+            token=create_access_token(user.id, getattr(user, 'role', UserRole.USER).value),
+            refresh_token=refresh_token,
+            user=UserLoginResp.model_validate(user),
+            token_type="bearer",
+        )
+        return ApiResp(success=True, message=str(user.id), data=tknSchUser)
+
+    async def authenticate(self, db: AsyncSession, *, email: str, password: str, pc_id: str) -> Optional[User]:
+        try:
+            user = await self.get_by_email(db, emailOrTel=email)
+            if not user: return None
+            
+            hashed = getattr(user, "hashed_password", None)            
+            if not hashed or not verify_password(password, hashed): return None
+
+            updated = False
+            if user.invite_code is None:
+                user.invite_code = generate_invite_code(user.id)
+                updated = True
+            if user.pc_id != pc_id:  # ✅ 修复：值比较用 !=
+                user.pc_id = pc_id
+                updated = True
+                
+            if updated:
+                user.updated_at = datetime.now(timezone.utc) 
+                await db.commit()
+                await db.refresh(user)
+            return user
+        except Exception as e:
+            logging.error(f"Auth error: {e}")
+            return None
+
+    async def user_list(self, db: AsyncSession, *, size: int = 10, for_admin: bool = False, page: int = 1, sort_by: str = "id", sort_order: str = "asc") -> Tuple[Sequence[UserForAdmin], int]:
+        page = max(page, 1)
+        size = max(min(size, 100), 1)
+        valid_sort_fields = {"id": User.id, "name": User.username, "created_at": User.created_at}
+        sort_column = valid_sort_fields.get(sort_by, User.id)
+        sort_expr = sort_column.asc() if sort_order == "asc" else sort_column.desc()
+
+        base_q = select(User).where(User.is_active.is_(True))
+        if not for_admin: base_q = base_q.where(User.role == UserRole.USER)
+        
+        # ✅ 修复：安全计数查询
+        total = (await db.execute(select(func.count()).select_from(base_q.subquery()))).scalar_one() or 0
+        if total == 0: return [], 0
+
+        result = await db.execute(base_q.order_by(sort_expr).offset((page - 1) * size).limit(size))
+        return [UserForAdmin.model_validate(u) for u in result.scalars().all()], total
+
+    async def search_users(self, db: AsyncSession, *, area: str, keyword: str, gender: int = -1, min_age: Optional[int] = None, max_age: Optional[int] = None, page: int = 1, limit: int = 10) -> Tuple[int, Sequence[UserInDB]]:
+        q = select(User).where(User.on_show.is_(True))
+        if gender != -1: q = q.where(User.gender == gender)
+        today = datetime.now(timezone.utc).date()
+        if min_age is not None: q = q.where(User.birth_year <= today.year - min_age)
+        if max_age is not None: q = q.where(User.birth_year > today.year - max_age - 1)
+        if area: q = q.where(User.living_city == area)
+        if keyword:
+            k = f"%{keyword}%"
+            q = q.where(or_(User.username.ilike(k), User.bio.ilike(k), User.living_city.ilike(k), User.dowry.ilike(k)))
+
+        total = await db.scalar(select(func.count()).select_from(q.subquery())) or 0
+        if not total: return 0, []
+        
+        result = await db.execute(q.order_by(User.created_at.desc()).offset((page - 1) * limit).limit(limit))
+        return total, [UserInDB.model_validate(u) for u in result.scalars().all()]
+
+    async def request_reset_pwd(self, email: str, db: AsyncSession) -> ApiResp:
+        user = await self.get_by_email(db, emailOrTel=email)  
+        if not user: return ApiResp(success=False, message="User not found")
+        try:
+            user.reset_pwd_token = smtp.create_reset_token(email)
+            user.updated_at = datetime.now(timezone.utc)
+            await db.commit()
+            return await smtp.send_email_async(to=email, token=user.reset_pwd_token)
+        except Exception as e:
+            await db.rollback()
+            return ApiResp(success=False, message=str(e))
+
+    async def get_by_pc_Id(self, db: AsyncSession, pcId: str) -> Optional[User]:
+        result = await db.execute(select(User).where(User.pc_id == pcId))
+        return result.scalars().first()
+
+    async def down_cv(self, db: AsyncSession, uid: int) -> bool:
+        user = await self.get_by_id(db, id=uid)
+        if user:
+            user.on_show = False
+            user.updated_at = datetime.now(timezone.utc)
+            await db.commit()
+            return True
+        return False
 
     async def lost_pwd_reset(self, newPwdModel: LostPasswordReset, db: AsyncSession):
-        token = newPwdModel.token
-        new_pwd = newPwdModel.newPassword
-        email = smtp.get_mail_exp(
-            token=token
-        )
-        if not email:
-            return ApiResp(success=False, message="Token invalid or expired")
+        email = smtp.get_mail_exp(token=newPwdModel.token)
+        if not email: return ApiResp(success=False, message="Token invalid or expired")
 
         user = await self.get_by_email(db, emailOrTel=email)
-        rpt = getattr(user, "reset_pwd_token", None)
-        if user is None or rpt != token:
+        if not user or user.reset_pwd_token != newPwdModel.token:  # ✅ 修复：先判空再取值
             return ApiResp(success=False, message="Invalid token")
-        pwd = get_password_hash(new_pwd)
-        setattr(user, "hashed_password", pwd)
-        setattr(user, "reset_pwd_token", None)
+            
+        user.hashed_password = get_password_hash(newPwdModel.newPassword)
+        user.reset_pwd_token = None
         user.updated_at = datetime.now(timezone.utc)
-        db.add(user)
         await db.commit()
-        await db.refresh(user)
         return ApiResp(success=True, message="Password reset successfully")
 
-
-    async def admin_update_user(
-        self, db: AsyncSession, *, db_obj: User, obj_in: AdminUserUpdate
-    ) -> User:
+    async def admin_update_user(self, db: AsyncSession, *, db_obj: User, obj_in: AdminUserUpdate) -> User:
         updated = False
-        if obj_in.role is not None and db_obj.role is not obj_in.role:
-            setattr(db_obj, "role", obj_in.role)
-            updated = True
-        if obj_in.is_active is not None and db_obj.is_active is not obj_in.is_active:
-            setattr(db_obj, "is_active", obj_in.is_active)  
-            updated = True
+        if obj_in.role is not None and db_obj.role != obj_in.role:  # ✅ 修复：值比较
+            db_obj.role = obj_in.role; updated = True
+        if obj_in.is_active is not None and db_obj.is_active != obj_in.is_active:  # ✅ 修复：值比较
+            db_obj.is_active = obj_in.is_active; updated = True
+            
         if updated:
             db_obj.updated_at = datetime.now(timezone.utc)
-            db.add(db_obj)
             await db.commit()
             await db.refresh(db_obj)
         return db_obj
 
-
-user_crud = CRUDUser(User)
 
 
 # ✅ 异步版 get_user_count_by_country

@@ -3,7 +3,6 @@ from app.core.config import settings
 from app.api.v1 import api_router
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.httpsredirect import HTTPSRedirectMiddleware
-from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 from app.core.req_limiter import rate_limit_middleware
 from fastapi import FastAPI
