@@ -54,7 +54,7 @@ class OneApiSvc:
     ):
         # 清理URL，统一格式
         self.base_url = base_url.rstrip("/")
-        self.chat_url = f"{self.base_url}/chat/completions"
+        self.chat_url = f"{self.base_url}/v1/chat/completions"
         self.embeddings_url = f"{self.base_url}/embeddings"
         self.models_url = f"{self.base_url}/v1/models"
         self.api_key = api_key 
@@ -150,44 +150,54 @@ class OneApiSvc:
         return StreamIterator(_inner_gen(), tracker, full_text)
 
     async def _chat_llm(
-        self,
-        json_data: Dict[str, Any] | None,
-        method: str = "POST",
-        url: Optional[str] = None,
+            self,
+            json_data: Dict[str, Any] | None,
+            method: str = "POST",
+            url: Optional[str] = None,
     ) -> Tuple[Dict, Dict]:
-        """统一请求方法：增强健壮性"""
         url = url or self.chat_url
         json_data = json_data or {}
-        tracker = UsageTracker( messages=json_data.get("messages"), model=json_data.get("model",'default'))
-        logger.debug("\n [*]:requesting url => %s", url)
+        tracker = UsageTracker(messages=json_data.get("messages"), model=json_data.get("model", 'default'))
+        
         resp = await self.client.request(
             method=method,
             url=url,
             headers=self._headers(),
             json=json_data,
         )
-
+    
+        # ✅ 先读取一次原始内容，全程使用异步读取
+        raw_content = await resp.aread()  # 只读一次！
+        
         # 统一错误处理
         if resp.status_code >= 400:
-            text = await resp.aread()
-            error_msg = f"HTTP {resp.status_code}: {text[:800]}"
+            error_msg = f"HTTP {resp.status_code}: {raw_content[:800]}"
+            print("【错误返回】", raw_content)  # 调试用
             if resp.status_code in (429, 500, 502, 503, 504):
                 raise RetryableAPIError(error_msg)
             raise OneAPIError(error_msg)
 
         try:
-            data = resp.json()
+            # ✅ 从已读取的 bytes 数据解析 JSON（关键修复）
+            import json
+            data = json.loads(raw_content)
         except Exception as e:
-            # 非 JSON 响应，包装为 OneAPIError
-            text = await resp.aread()
-            print(text)
-            logger.error("Non-JSON response HTTP %s: %s", resp.status_code, str(text))
-            raise OneAPIError(f"Invalid JSON response HTTP {resp.status_code}: {str(e)}")
+                # 打印原始请求体
+            logger.warning("🔥 请求体 json_data = %s", json_data)
+            # 打印原始响应信息
+            logger.warning("🔥 resp.status_code = %s", resp.status_code)
+            raw_content=await resp.aread()
+            logger.warning("🔥 raw_content = %r", raw_content)  # 看真实字节
+            logger.warning("🔥 resp.headers = %s", resp.headers)
+
+            logger.error("Non-JSON response HTTP %s: %s", resp.status_code, raw_content)
+            raise OneAPIError(f"Invalid JSON response HTTP {resp.status_code}: {str(e)} | content={raw_content[:200]}")
 
         usage = data.get("usage") or tracker.finalize(
             data.get("choices", [{}])[0].get("message", {}).get("content", "")
         )
         return data, usage
+
 
     # async def embeddings(self, model: str, input_text: str | List[str]) -> Tuple[Dict, Dict]:
     #     return await self._request(

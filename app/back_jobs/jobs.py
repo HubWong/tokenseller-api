@@ -3,9 +3,12 @@ from datetime import datetime
 import httpx
 from app.core.database import AsyncSessionLocal
 from app.back_jobs.db_tasks import clean_expired_files_db
+from app.services.oneapi.oneapi_models_sync import ModelPricingSyncService
+from app.services.oneapi_svc import OneApiSvc
 from app.features.biz.order.price_repo import PriceRepo
 from app.features.biz.order.order_repo import OrderRepo
 from app.core.config import settings
+from app.services.tools_svc import check_api_reachable
 
 oneapi_url = settings.ONEAPI_URL
 import asyncio
@@ -32,6 +35,10 @@ async def run_remove_expired_orders():
         order_repo = OrderRepo(session)
         await order_repo.remove_expired_orders()
 
+async def run_sync_chanels():
+    async with AsyncSessionLocal() as session:
+        await ModelPricingSyncService.sync_from_channels(db=session)
+
 def job_clean_expired_files():    
     run_async_task(run_clean())
     
@@ -39,7 +46,10 @@ def job_clean_expired_files():
 def job_remove_expired_orders():
     run_async_task(run_remove_expired_orders())
     
-    
+
+def job_sync_db_onapi_channels():
+    run_async_task(run_sync_chanels())
+    print("\n [==>]job_sync_db_onapi_channels running...",datetime.now())
 
 
 def job_gen_reports():

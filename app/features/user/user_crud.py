@@ -132,7 +132,7 @@ class UserRepo:
         await token_crud.create_token(db, user_id=user.id, token=refresh_token, expire_at=exp)
         
         tknSchUser = TokenSchemaUser(
-            token=create_access_token(user.id, getattr(user, 'role', UserRole.USER).value),
+            token=create_access_token(user.id, getattr(user, 'role', UserRole.USER.value)),
             refresh_token=refresh_token,
             user=UserLoginResp.model_validate(user),
             token_type="bearer",

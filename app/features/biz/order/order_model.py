@@ -79,43 +79,125 @@ class CommissionLog(Base, TimestampMixin):
         nullable=True
     )
 
-
 class ModelPricing(Base, TimestampMixin):
-    """Model pricing configuration table"""
+
     __tablename__ = "model_pricing"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    id: Mapped[int] = mapped_column(primary_key=True)
+
+    # oneapi模型名
     model_name: Mapped[str] = mapped_column(
-        String(100),
+        String(120),
         unique=True,
-        index=True,
-        nullable=False
+        index=True
     )
 
+    # oneapi渠道信息
+    provider_type: Mapped[int] = mapped_column(
+        Integer,
+        nullable=True
+    )
+
+    provider_name: Mapped[str] = mapped_column(
+        String(50),
+        nullable=True
+    )
+
+    group_name: Mapped[str] = mapped_column(
+        String(50),
+        nullable=True
+    )
+
+    priority: Mapped[int] = mapped_column(
+        Integer,
+        default=0
+    )
+
+    weight: Mapped[int] = mapped_column(
+        Integer,
+        default=0
+    )
+
+    # 成本
     input_cost: Mapped[float] = mapped_column(
         Numeric(10, 6),
         nullable=True
     )
+
     output_cost: Mapped[float] = mapped_column(
         Numeric(10, 6),
         nullable=True
     )
 
+    # 售价
     input_price: Mapped[float] = mapped_column(
         Numeric(10, 6),
-        nullable=False
+        default=0
     )
+
     output_price: Mapped[float] = mapped_column(
         Numeric(10, 6),
-        nullable=False
+        default=0
     )
+
     currency: Mapped[str] = mapped_column(
         String(10),
         default="USD"
     )
+
+    # oneapi渠道状态
+    channel_status: Mapped[int] = mapped_column(
+        Integer,
+        default=1
+    )
+
+    # fastapi内部状态
     is_active: Mapped[bool] = mapped_column(
         Integer,
         default=1
     )
 
-    level: Mapped[int] = mapped_column(Integer,default=3)
+    level: Mapped[int] = mapped_column(
+        Integer,
+        default=3
+    )
+
+# class ModelPricing(Base, TimestampMixin):
+#     """Model pricing configuration table"""
+#     __tablename__ = "model_pricing"
+
+#     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+#     model_name: Mapped[str] = mapped_column(
+#         String(100),
+#         unique=True,
+#         index=True,
+#         nullable=False
+#     )
+
+#     input_cost: Mapped[float] = mapped_column(
+#         Numeric(10, 6),
+#         nullable=True
+#     )
+#     output_cost: Mapped[float] = mapped_column(
+#         Numeric(10, 6),
+#         nullable=True
+#     )
+
+#     input_price: Mapped[float] = mapped_column(
+#         Numeric(10, 6),
+#         nullable=False
+#     )
+#     output_price: Mapped[float] = mapped_column(
+#         Numeric(10, 6),
+#         nullable=False
+#     )
+#     currency: Mapped[str] = mapped_column(
+#         String(10),
+#         default="USD"
+#     )
+#     is_active: Mapped[bool] = mapped_column(
+#         Integer,
+#         default=1
+#     )
+
+#     level: Mapped[int] = mapped_column(Integer,default=3)

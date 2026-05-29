@@ -1,5 +1,5 @@
 from apscheduler.schedulers.background import BackgroundScheduler
-from app.back_jobs.jobs import job_clean_expired_files,job_remove_expired_orders, job_gen_reports
+from app.back_jobs.jobs import job_sync_db_onapi_channels, job_clean_expired_files,job_remove_expired_orders, job_gen_reports
 from contextlib import asynccontextmanager, suppress
 from fastapi import FastAPI
 import asyncio
@@ -33,7 +33,13 @@ def start_scheduler():
             "max_instances": 1,
         }
     )
-    
+    scheduler.add_job(
+        job_sync_db_onapi_channels,
+        "interval",
+        minutes=7,
+        id="sync_db_onapi_channels",
+        replace_existing=True
+    )
     scheduler.add_job(
         job_clean_expired_files,
         "interval",
@@ -41,6 +47,8 @@ def start_scheduler():
         id="clean_files",
         replace_existing=True
     )
+
+
 
     scheduler.add_job(
         job_remove_expired_orders,

@@ -38,7 +38,7 @@ class CRUDApiKey(CRUDBase[ApiKey, ApiKeyResp, ApiKeyResp]):
             print("error:", str(ex))
         return key   
      
-    async def auth_user(self,db: AsyncSession, request: Request,balance_repo:TransactionRepo) -> tuple:
+    async def auth_user(self,db: AsyncSession, request: Request,trans_repo:TransactionRepo) -> tuple:
         auth = request.headers.get("Authorization")
         if not auth:
             raise HTTPException(401, "Missing API Key")
@@ -50,7 +50,7 @@ class CRUDApiKey(CRUDBase[ApiKey, ApiKeyResp, ApiKeyResp]):
             raise HTTPException(403, "Invalid API Key")        
         
         #_,_,_,left = await token_respo.get_request_log(uid=int(uid))
-        left = await balance_repo.query_transaction_sum(session=db, maker_id=uid)
+        left = await trans_repo.query_transaction_sum(session=db, maker_id=uid)
         if left == 0:
             raise HTTPException(status_code=402,detail = "No token left")
         return user,left
