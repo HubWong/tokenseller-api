@@ -67,82 +67,100 @@ oauth.register(
     }
 )
 
-
 async def get_or_create_oauth_user(
     db: AsyncSession,
     email: str,
     provider: str,
-    one_api_svc:OneApiDeps,
+    one_api_svc: OneApiDeps,
     user_crud: UserRepoDeps,
     provider_id: Optional[str] = None,
     name: Optional[str] = None,
     transaction_repo: Optional[TransactionRepo] = None,
 ) -> User:
-    """获取或创建 OAuth 用户"""
+    """获取或创建 OAuth 用户（修复事务冲突）"""
+
+    # 1. 查询用户
     user = await user_crud.get_by_email(db, emailOrTel=email)
 
     if user:
-        # 更新已有用户的 OAuth 字段（如果为空）
+        # 更新 OAuth 信息
         updated = False
-        if not getattr(user, 'oauth_provider', None):
-            setattr(user, 'oauth_provider', provider)
+        if not user.oauth_provider:
+            user.oauth_provider = provider
             updated = True
-        if not getattr(user, 'oauth_id', None) and provider_id:
-            setattr(user, 'oauth_id', provider_id)
+        if provider_id and not user.oauth_id:
+            user.oauth_id = provider_id
             updated = True
+
+        # 统一一次提交，不要多次
         if updated:
             await db.commit()
             await db.refresh(user)
         return user
 
-    # 创建新 OAuth 用户
-    username = name or email.split('@')[0]
-    user = User(
-        email=email,
-        username=username,
-        is_active=True,
-        oauth_provider=provider,
-        oauth_id=provider_id,
-    )
-    db.add(user)
-    await db.commit()
-    await db.refresh(user)
+    # ------------------------------
+    # 下面是创建新用户逻辑（核心修复）
+    # ------------------------------
+    try:
+        # 1. 创建用户（只 add，不提交）
+        username = name or email.split('@')[0]
+        user = User(
+            email=email,
+            username=username,
+            is_active=True,
+            oauth_provider=provider,
+            oauth_id=provider_id,
+        )
+        db.add(user)
 
-    # 生成邀请码
-    invite_code = generate_invite_code(getattr(user,'id'))
-    setattr(user, 'invite_code', invite_code)
-    await db.commit()
-    await db.refresh(user)
+        # 第一次提交：获取用户 ID
+        await db.commit()
+        await db.refresh(user)
 
-    # 赠送免费额度
-    if transaction_repo:
+        # 2. 生成邀请码
+        user.invite_code = generate_invite_code(user.id)
+        await db.commit()
+        await db.refresh(user)
+
+        # 3. 赠送额度
+        if transaction_repo:
+            try:
+                await transaction_repo.create_transaction(
+                    session=db,
+                    maker_id=user.id,
+                    amount=settings.FREE_AMOUNT,
+                    transaction_type=TransactionType.RECHARGE_FREE
+                )
+                await db.commit()
+            except Exception as e:
+                logger.warning(f"赠送免费额度失败: {e}")
+
+        # 4. 生成 API Key
         try:
-            await transaction_repo.create_transaction(
-                session=db,
-                maker_id=int(getattr(user,'id')),
-                amount=settings.FREE_AMOUNT,transaction_type=TransactionType.RECHARGE_FREE
-            )
+            await apikey_crud.generate_api_key(db=db, user_id=user.id)
             await db.commit()
         except Exception as e:
-            logger.warning(f"Failed to add free tokens for OAuth user: {e}")
+            logger.warning(f"生成 API Key 失败: {e}")
 
-    # 生成 API Key
-    try:
-        await apikey_crud.generate_api_key(db=db, user_id=getattr(user, 'id'))
-        await db.commit()
+        # 5. 同步到 OneAPI（外部操作，不占 DB 连接）
+        if one_api_svc:
+            try:
+                await one_api_svc.create_oneapi_user(
+                    username=username,
+                    access_token=settings.ONEAPI_ACCESS_TOKEN,
+                    pwd=f"oauth_{provider}_{provider_id}"
+                )
+            except Exception as e:
+                logger.warning(f"同步 OneAPI 用户失败: {e}")
+
+        return user
+
     except Exception as e:
-        logger.warning(f"Failed to generate API key for OAuth user: {e}")
+        # 出现任何错误 → 回滚！这是修复连接冲突的关键！
+        await db.rollback()
+        logger.error(f"创建 OAuth 用户失败，已回滚事务: {e}")
+        raise
 
-    # 同步到 OneAPI
-    if one_api_svc:
-        try:
-            await one_api_svc.create_oneapi_user(username=username, 
-                access_token=settings.ONEAPI_ACCESS_TOKEN, 
-                pwd=f"oauth_{provider}_{provider_id}")
-        except Exception as e:
-            logger.warning(f"Failed to create OneAPI user for OAuth: {e}")
-
-    return user
 
 
 @router.get("/github")
