@@ -31,10 +31,9 @@ class CRUDApiKey(CRUDBase[ApiKey, ApiKeyResp, ApiKeyResp]):
         )
         try:
             db.add(api_key)
-            await db.commit()
-            await db.refresh(api_key)
+        
         except Exception as ex:
-            await db.rollback()
+          
             print("error:", str(ex))
         return key   
      

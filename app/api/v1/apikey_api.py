@@ -16,6 +16,7 @@ async def create_key_api(api_key: dict[str,str], user: DepUser, db: DbSessionDep
     role = user.role
     t = api_key.get('name')
     k = await crud.generate_api_key(db=db, user_id=int(getattr(user,'id')), key_title=str(t),tier=str(role))
+    await db.commit()
     return {"api_key": k}
 
 
