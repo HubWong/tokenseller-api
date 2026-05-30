@@ -1,8 +1,10 @@
 import socket
 import random
-import string
+import logging
 from dotenv import dotenv_values, set_key
 import requests
+
+logger =logging.getLogger(__name__)
 
 def set_env_if_not_exists(key, value, env_file=".env"):
     config = dotenv_values(env_file)
@@ -18,6 +20,7 @@ def check_api_reachable(host: str, timeout: int = 2) -> bool:
         # 自动补全协议
         url = f"http://{host}" if not host.startswith("http") else host
         
+        logger.info(f'one api connecting: {url}')
         # 用 get 也可以，timeout 保证不卡死
         requests.get(f'{url}/v1', timeout=timeout, stream=True)
         return True
