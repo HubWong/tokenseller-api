@@ -19,7 +19,7 @@ def check_api_reachable(host: str, timeout: int = 2) -> bool:
         url = f"http://{host}" if not host.startswith("http") else host
         
         # 用 get 也可以，timeout 保证不卡死
-        requests.get(url, timeout=timeout, stream=True)
+        requests.get(f'{url}/v1', timeout=timeout, stream=True)
         return True
         
     except:
