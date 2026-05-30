@@ -110,42 +110,41 @@ async def get_or_create_oauth_user(
     )
 
     try:
+        user = User(
+            email=email,
+            username=username,
+            is_active=True,
+            oauth_provider=provider,
+            oauth_id=provider_id,
+        )
 
-        async with db.begin():
+        db.add(user)
 
-            user = User(
-                email=email,
-                username=username,
-                is_active=True,
-                oauth_provider=provider,
-                oauth_id=provider_id,
+        # 获取ID
+        await db.flush()
+
+        user.invite_code = generate_invite_code(
+            user.id
+        )
+
+        if transaction_repo:
+            await transaction_repo.create_transaction(
+                session=db,
+                maker_id=user.id,
+                amount=settings.FREE_AMOUNT,
+                transaction_type=TransactionType.RECHARGE_FREE,
             )
 
-            db.add(user)
+        await apikey_crud.generate_api_key(
+            db=db,
+            user_id=user.id,
+        )
 
-            # 获取ID
-            await db.flush()
-
-            user.invite_code = generate_invite_code(
-                user.id
-            )
-
-            if transaction_repo:
-                await transaction_repo.create_transaction(
-                    session=db,
-                    maker_id=user.id,
-                    amount=settings.FREE_AMOUNT,
-                    transaction_type=TransactionType.RECHARGE_FREE,
-                )
-
-            await apikey_crud.generate_api_key(
-                db=db,
-                user_id=user.id,
-            )
-
+        await db.commit()
         await db.refresh(user)
 
     except Exception as e:
+        await db.rollback()
         logger.exception(
             f"创建 OAuth 用户失败: {e}"
         )

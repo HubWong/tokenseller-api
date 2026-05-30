@@ -42,31 +42,26 @@ class TransactionRepo:
         transaction_type: TransactionType,
         meta: Optional[Dict[str, str]] = None
     ):
-        try:
-            order_id = meta.get("id", None) if meta else None
-            from_uid = meta.get('user_id',None) if meta else None
+        order_id = meta.get("id", None) if meta else None
+        from_uid = meta.get('user_id', None) if meta else None
 
-            if transaction_type != TransactionType.RECHARGE_FREE:             
-                mm=f'from {from_uid}'
-            else:
-                mm=f'from {from_uid}'
-            balance_after = await self.query_transaction_sum(session, maker_id) 
-            balance_after += float(amount)
-            data = Transaction(
-                maker_id=maker_id,
-                amount=amount,
-                type=transaction_type.value,
-                memo=mm,
-                ref_id = str(order_id),
-                balance_after=float(balance_after)
-            )
-            session.add(data)
-            
-            return data
-        except Exception as e:
-            await session.rollback()
-            logger.error(f"Error adding transaction: {str(e)}")
-            return None           
+        if transaction_type != TransactionType.RECHARGE_FREE:
+            mm = f'from {from_uid}'
+        else:
+            mm = f'from {from_uid}'
+        balance_after = await self.query_transaction_sum(session, maker_id)
+        balance_after += float(amount)
+        data = Transaction(
+            maker_id=maker_id,
+            amount=amount,
+            type=transaction_type.value,
+            memo=mm,
+            ref_id=str(order_id),
+            balance_after=float(balance_after)
+        )
+        session.add(data)
+
+        return data           
                
     
     async def get_month_trans(self,user_id:int,type_str:str, db: AsyncSession)->tuple[Sequence[Transaction], float]:
