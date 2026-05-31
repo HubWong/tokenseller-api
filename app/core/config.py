@@ -33,7 +33,7 @@ class Settings(BaseSettings):
     
     PROJECT_ROOT: str = os.path.dirname(os.path.dirname(os.path.dirname(BASE_DIR)))  # backend/app/core -> backend/app -> backend -> token seller
     ONE_API_MASTERKEY :str = os.getenv("ONE_API_MASTER_KEY","sk-LpE8Zq7xhrwF3yrYFeBd1c5a8eF3458f9a9b23C3123a2b9f")
-    ONEAPI_URL:str =os.getenv('ONEAPI_BASE',"http://localhost:3000")
+    ONEAPI_URL:str =os.getenv('ONEAPI_BASE',"https://one-api-production-dd42.up.railway.app")
     ONE_API_ADMIN_KEY :str = os.getenv("ONE_API_ADMIN_KEY","")
     ONEAPI_ACCESS_TOKEN :str = '251b372a815a4393a2cdeaabe9b1d503'
     #room

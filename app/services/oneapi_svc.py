@@ -48,7 +48,7 @@ class RetryableAPIError(OneAPIError):
 class OneApiSvc:
     def __init__(
         self,
-        base_url: str = https://one-api-production-dd42.up.railway.app,
+        base_url: str = settings.ONEAPI_URL,
         api_key: Optional[str] = MASTER_KEY,
         timeout: int = 30,
     ):

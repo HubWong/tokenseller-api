@@ -91,7 +91,7 @@ class UserRepo:
             uid = setattr(db_obj, 'id', db_obj.id)
             await apikey_crud.generate_api_key(db=db, user_id=int(uid))
             
-            if check_api_reachable('https://one-api-production-dd42.up.railway.app', 3):
+            if check_api_reachable(settings.ONEAPI_URL, 3):
                 await one_api_svc.create_oneapi_user(username=db_obj.username, pwd=obj_in.password, access_token=settings.ONEAPI_ACCESS_TOKEN)
                 
             await db.commit()

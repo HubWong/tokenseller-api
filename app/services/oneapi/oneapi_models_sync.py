@@ -12,7 +12,7 @@ class ModelPricingSyncService:
     async def sync_from_channels(
         db: AsyncSession,
     ):
-        if not check_api_reachable(host='https://one-api-production-dd42.up.railway.app', timeout=2): 
+        if not check_api_reachable(host=settings.ONEAPI_URL, timeout=2): 
             return
         print("[*] ModelPricingSyncService.sync_from_channels start...")
         channels =await OneApiSvc.channels()

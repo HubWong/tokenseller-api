@@ -43,7 +43,7 @@ class PriceRepo:
             self.db.add(pricing)
             await self.db.commit()
             await self.db.refresh(pricing)
-            if check_api_reachable('https://one-api-production-dd42.up.railway.app',3):
+            if check_api_reachable(settings.ONEAPI_URL,3):
                from app.core.application import fapp
                await fapp.state.oneapi_svc.create_model(model_name, input_cost, output_cost)
             return pricing
