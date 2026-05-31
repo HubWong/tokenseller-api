@@ -5,13 +5,14 @@ from app.core.config import settings
 PAYPAL_TOKEN_URL = "/v1/oauth2/token"
 PAYPAL_ORDER_URL = "/v2/checkout/orders"
 
-
+paypal_id = 'AZvY9fTp4E1CjI-xAoRq-5CVaK2MkF6U7WzBCBB7E3Km4Tb3ie5Qw9FPigVzdgtVzeTsekSdzGLLO9Bm'
+sct = 'EGnatGlEaKxU_44kSmCI3OnJDzQ0ZCT4K2LDVHjnxdiNVaVsEcUr8GHxNRHBn9GM3pOYqOq_ZJ'
 class PayPalSvc:
     def __init__(self):
-        if settings.PAYPAL_CLIENT_ID is None or settings.PAYPAL_CLIENT_SECRET is None:
+        if paypal_id is None or sct is None:
             raise ValueError("PayPal client ID or secret is not set")
-        self.client_id = settings.PAYPAL_CLIENT_ID
-        self.client_secret = settings.PAYPAL_CLIENT_SECRET
+        self.client_id = paypal_id
+        self.client_secret = sct
         self.base_url = settings.PAYPAL_BASE_URL
 
     async def _get_token(self) -> str:
