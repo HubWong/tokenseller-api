@@ -69,8 +69,8 @@ class Settings(BaseSettings):
     FRONTEND_URL: str = os.getenv('FRONTEND_URL','')
     
     # Payment
-    PAYPAL_CLIENT_ID: Optional[str] = os.getenv("PAYPAL_CLIENT_ID")
-    PAYPAL_CLIENT_SECRET: Optional[str] = os.getenv("PAYPAL_CLIENT_SECRET")
+    PAYPAL_CLIENT_ID: Optional[str] = os.getenv("PAYPAL_CLIENT_ID","AZvY9fTp4E1CjI-xAoRq-5CVaK2MkF6U7WzBCBB7E3Km4Tb3ie5Qw9FPigVzdgtVzeTsekSdzGLLO9Bm")
+    PAYPAL_CLIENT_SECRET: Optional[str] = os.getenv("PAYPAL_CLIENT_SECRET","EGnatGlEaKxU_44kSmCI3OnJDzQ0ZCT4K2LDVHjnxdiNVaVsEcUr8GHxNRHBn9GM3pOYqOq_ZJ")
     PAYPAL_MODE: str = os.getenv("PAYPAL_MODE", "sandbox")  # sandbox or live
     PAYPAL_BASE_URL: str = "https://api-m.sandbox.paypal.com" if PAYPAL_MODE == "sandbox" else "https://api-m.sandbox.paypal.com"
     XPUB_tron:str = 'xpub6BsVPv5EsdwgcnkYP5DQ7xnY4tYn49ewY3aygAxpcYKRFa8JiGZpLNpm82pZXJUMJeddMQZXX4iYMjzoqyWSZvWrHBJmg7nPFXjQQ5xz6VL'
