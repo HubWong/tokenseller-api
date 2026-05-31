@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 # 从配置读取主密钥，避免硬编码
 MASTER_KEY = getattr(settings, "ONE_API_MASTERKEY", None)
-create_userapi = f"https://one-api-production-dd42.up.railway.app/api/user"
+create_userapi = f"{settings.ONEAPI_URL}/api/user"
 
 PRICE_INPUT = Decimal("0.002")
 PRICE_OUTPUT = Decimal("0.004")
@@ -208,7 +208,7 @@ class OneApiSvc:
 
     @staticmethod
     async def channels():
-        chan_url = https://one-api-production-dd42.up.railway.app+'/api/channel/'
+        chan_url = f'{settings.ONEAPI_URL}/api/channel/'
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.get(

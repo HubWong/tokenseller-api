@@ -61,7 +61,7 @@ class PriceRepo:
         return result.scalars().first()
 
     async def get_oneapi_models(self):
-        url = f'https://one-api-production-dd42.up.railway.app/v1/models'
+        url = f'{settings.ONEAPI_URL}/v1/models'
         token = settings.ONE_API_MASTERKEY
         try:                
             async with httpx.AsyncClient() as client:
