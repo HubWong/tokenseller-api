@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 # 从配置读取主密钥，避免硬编码
 MASTER_KEY = getattr(settings, "ONE_API_MASTERKEY", None)
-create_userapi = f"{settings.ONEAPI_URL}/api/user"
+create_userapi = f"https://one-api-production-dd42.up.railway.app/api/user"
 
 PRICE_INPUT = Decimal("0.002")
 PRICE_OUTPUT = Decimal("0.004")
@@ -48,7 +48,7 @@ class RetryableAPIError(OneAPIError):
 class OneApiSvc:
     def __init__(
         self,
-        base_url: str = settings.ONEAPI_URL,
+        base_url: str = https://one-api-production-dd42.up.railway.app,
         api_key: Optional[str] = MASTER_KEY,
         timeout: int = 30,
     ):
@@ -208,7 +208,7 @@ class OneApiSvc:
 
     @staticmethod
     async def channels():
-        chan_url = settings.ONEAPI_URL+'/api/channel/'
+        chan_url = https://one-api-production-dd42.up.railway.app+'/api/channel/'
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.get(

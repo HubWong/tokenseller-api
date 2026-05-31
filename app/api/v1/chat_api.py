@@ -65,7 +65,7 @@ async def one_api_llm_test(
     # =========================================================
 
     is_open = check_api_reachable(
-        settings.ONEAPI_URL,
+        'https://one-api-production-dd42.up.railway.app',
         6
     )
 

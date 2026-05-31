@@ -22,7 +22,7 @@ def check_api_reachable(host: str, timeout: int = 2) -> bool:
         
         logger.info(f'one api connecting: {url}')
         # 用 get 也可以，timeout 保证不卡死
-        requests.get(f'{url}/v1', timeout=timeout, stream=True)
+        requests.get(f'{url}/health', timeout=timeout, stream=True)
         return True
         
     except:

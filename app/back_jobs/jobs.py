@@ -10,7 +10,7 @@ from app.features.biz.order.order_repo import OrderRepo
 from app.core.config import settings
 from app.services.tools_svc import check_api_reachable
 
-oneapi_url = settings.ONEAPI_URL
+oneapi_url = 'https://one-api-production-dd42.up.railway.app'
 import asyncio
 # 顶层统一运行异步任务的工具函数
 def run_async_task(coro):
