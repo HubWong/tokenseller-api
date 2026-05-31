@@ -85,6 +85,7 @@ async def update_model(
             input_price=model_data.input_price,
             output_price=model_data.output_price,
             currency=model_data.currency,
+            level=model_data.level,
             is_active=model_data.is_active
         )
         if not model:

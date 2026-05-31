@@ -113,6 +113,7 @@ class PriceRepo:
     async def update_pricing(
         self,
         model_name: str,
+        level= 2,
         input_cost: Optional[float] = None,
         output_cost: Optional[float] = None,
         input_price: Optional[float] = None,
@@ -142,7 +143,7 @@ class PriceRepo:
             update_data['currency'] = currency
         if is_active is not None:
             update_data['is_active'] = 1 if is_active else 0
-
+        update_data['level'] = level
         if update_data:
             stmt = (
                 update(ModelPricing)
