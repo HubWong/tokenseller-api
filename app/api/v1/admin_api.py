@@ -79,7 +79,7 @@ async def delete_user(
     user_crud: UserRepoDeps
 ):
     """删除用户"""
-    user = user_crud.get_by_id(db, id=user_id)
+    user = await user_crud.get_by_id(db, id=user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     await user_crud.remove(db, id=user_id)

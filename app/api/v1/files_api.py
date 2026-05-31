@@ -66,7 +66,7 @@ async def upload_avatar(
    
 
 @router.delete("/del_photo/{photo_id}")
-async def delete_photo(photo_id: int, db:DbSessionDeps, cur_DepUser):
+async def delete_photo(photo_id: int, db:DbSessionDeps, cur_user: DepUser):
     if not cur_user.id:
         return ApiResp(success=False, message="用户ID不能为空") 
     isAvatar,deleted_photo =await photo_crud.delete_photo(db=db, photo_id=photo_id)
@@ -83,7 +83,7 @@ async def delete_photo(photo_id: int, db:DbSessionDeps, cur_DepUser):
 
 
 @router.get("/get_photos")
-async def get_photos(db: DbSessionDeps, cur_DepUser):
+async def get_photos(db: DbSessionDeps, cur_user: DepUser):
     user_id = cur_user.id
     if not user_id:
         return ApiResp(success=False, message="用户ID不能为空")
@@ -97,7 +97,7 @@ async def get_photos(db: DbSessionDeps, cur_DepUser):
 
 
 @router.patch('/is_private/{photo_id}')
-async def toggle_photo_privacy(photo_id: int, db:DbSessionDeps, cur_DepUser):
+async def toggle_photo_privacy(photo_id: int, db:DbSessionDeps, cur_user: DepUser):
     if not cur_user.id:
         return ApiResp(success=False, message="用户ID不能为空") 
     updated_photo = await photo_crud.update_privacy(db=db, photo_id=photo_id, user_id=cur_user.id)

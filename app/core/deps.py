@@ -55,7 +55,7 @@ TransRepoDeps = Annotated[TransactionRepo, Depends(get_transaction_rep)]
 async def get_apikey_crud():
     return apikey_crud
 
-async def get_user_repo(db:AsyncSession= Depends(get_db_manual)):
+def get_user_repo():
     return UserRepo()
 
 UserRepoDeps = Annotated[UserRepo, Depends(get_user_repo)]
