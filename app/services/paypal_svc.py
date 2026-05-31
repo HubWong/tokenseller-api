@@ -48,6 +48,10 @@ class PayPalSvc:
                 "cancel_url": cancel_url,
             },
         }
+        logger.info("************************************************")
+        logger.info('\n [**]: papal url:',f"{self.base_url}{PAYPAL_ORDER_URL}:token={token},payload={payload}")
+        logger.info("************************************************")
+
         async with httpx.AsyncClient() as client:
             resp = await client.post(
                 f"{self.base_url}{PAYPAL_ORDER_URL}",
