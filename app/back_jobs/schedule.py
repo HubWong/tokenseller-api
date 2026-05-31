@@ -1,10 +1,9 @@
-from apscheduler.schedulers.background import BackgroundScheduler
-from app.back_jobs.jobs import job_sync_db_onapi_channels, job_clean_expired_files,job_remove_expired_orders, job_gen_reports
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from app.back_jobs.jobs import job_sync_db_onapi_channels, job_clean_expired_files, job_remove_expired_orders, job_gen_reports
 from contextlib import asynccontextmanager, suppress
 from fastapi import FastAPI
 import asyncio
 from app.services.file_svc import create_upload_dir
-from concurrent.futures import ThreadPoolExecutor
 from app.services.oneapi_svc import OneApiSvc
 from app.services.listener_svc import order_pool
 from app.core.config import settings
@@ -19,15 +18,15 @@ logger.setLevel(logging.INFO)
 if not logger.handlers:
     logging.basicConfig(level=logging.INFO)
 
-scheduler: BackgroundScheduler | None = None
-executor = ThreadPoolExecutor(max_workers=1)
+scheduler: AsyncIOScheduler | None = None
 
-def start_scheduler():    
+
+def start_scheduler():
     global scheduler
     if scheduler:
-        return scheduler  
+        return scheduler
 
-    scheduler = BackgroundScheduler(
+    scheduler = AsyncIOScheduler(
         job_defaults={
             "coalesce": False,
             "max_instances": 1,
@@ -38,38 +37,33 @@ def start_scheduler():
         "interval",
         minutes=7,
         id="sync_db_onapi_channels",
-        replace_existing=True
+        replace_existing=True,
     )
     scheduler.add_job(
         job_clean_expired_files,
         "interval",
         minutes=10,
         id="clean_files",
-        replace_existing=True
+        replace_existing=True,
     )
-
-
-
     scheduler.add_job(
         job_remove_expired_orders,
         "interval",
         minutes=30,
         id="remove_expired_orders",
-        replace_existing=True
+        replace_existing=True,
     )
-
     scheduler.add_job(
         job_gen_reports,
         "interval",
         weeks=1,
         id="gen_reports",
-        replace_existing=True
+        replace_existing=True,
     )
 
     scheduler.start()
-    print('Scheduler started.')
+    logger.info("Scheduler started.")
     return scheduler
-
 
 
 def stop_scheduler():
@@ -77,7 +71,7 @@ def stop_scheduler():
     if scheduler:
         scheduler.shutdown()
         scheduler = None
-        print("Scheduler stopped.")
+        logger.info("Scheduler stopped.")
         
  
 async def init_db():
@@ -150,8 +144,7 @@ async def lifespanJob(app: FastAPI):
 
     app.state.tron_listener_task = asyncio.create_task(_listener_background())
 
-    loop = asyncio.get_running_loop()
-    await loop.run_in_executor(executor, start_scheduler)
+    start_scheduler()
     try:
         yield
     finally:
@@ -161,4 +154,4 @@ async def lifespanJob(app: FastAPI):
                 await app.state.tron_listener_task
 
         await app.state.oneapi_svc.close()
-        await loop.run_in_executor(executor, stop_scheduler)
+        stop_scheduler()

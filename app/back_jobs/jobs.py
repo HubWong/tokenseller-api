@@ -1,59 +1,36 @@
 from datetime import datetime
 
-import httpx
 from app.core.database import AsyncSessionLocal
 from app.back_jobs.db_tasks import clean_expired_files_db
 from app.services.oneapi.oneapi_models_sync import ModelPricingSyncService
-from app.services.oneapi_svc import OneApiSvc
 from app.features.biz.order.price_repo import PriceRepo
 from app.features.biz.order.order_repo import OrderRepo
 from app.core.config import settings
-from app.services.tools_svc import check_api_reachable
+import logging
 
+logger = logging.getLogger(__name__)
 oneapi_url = settings.ONEAPI_URL
-import asyncio
-# 顶层统一运行异步任务的工具函数
-def run_async_task(coro):
-    """安全运行异步协程"""
-    try:
-        # 获取当前事件循环（如果存在）
-        loop = asyncio.get_event_loop()
-    except RuntimeError:
-        # 没有则创建新的事件循环
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-    
-    # 运行协程直到完成
-    return loop.run_until_complete(coro)
 
-async def run_clean():
+
+async def job_clean_expired_files():
     async with AsyncSessionLocal() as session:
         await clean_expired_files_db()
 
-async def run_remove_expired_orders():
+
+async def job_remove_expired_orders():
     async with AsyncSessionLocal() as session:
         order_repo = OrderRepo(session)
         await order_repo.remove_expired_orders()
 
-async def run_sync_chanels():
+
+async def job_sync_db_onapi_channels():
     async with AsyncSessionLocal() as session:
         await ModelPricingSyncService.sync_from_channels(db=session)
-
-def job_clean_expired_files():    
-    run_async_task(run_clean())
-    
-
-def job_remove_expired_orders():
-    run_async_task(run_remove_expired_orders())
-    
-
-def job_sync_db_onapi_channels():
-    run_async_task(run_sync_chanels())
-    print("\n [==>]job_sync_db_onapi_channels running...",datetime.now())
+    logger.info("[==>] job_sync_db_onapi_channels running... %s", datetime.now())
 
 
-def job_gen_reports():
-    print("job_gen_reports running...",datetime.now())
+async def job_gen_reports():
+    logger.info("job_gen_reports running... %s", datetime.now())
     
 
 
