@@ -172,7 +172,7 @@ class UserRepo:
         sort_expr = sort_column.asc() if sort_order == "asc" else sort_column.desc()
 
         base_q = select(User).where(User.is_active.is_(True))
-        if not for_admin: base_q = base_q.where(User.role == UserRole.USER)
+        if not for_admin: base_q = base_q.where(User.role == UserRole.USER.value)
         
         # ✅ 修复：安全计数查询
         total = (await db.execute(select(func.count()).select_from(base_q.subquery()))).scalar_one() or 0
